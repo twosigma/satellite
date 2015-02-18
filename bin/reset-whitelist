@@ -1,0 +1,1 @@
+for x in $(curl localhost:5050/whitelist/all); do curl -X DELETE localhost:5050/whitelist/host/$x ; done;
