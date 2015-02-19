@@ -1,5 +1,4 @@
-(ns satellite.util
-  (require [clj-http.client :as client]))
+(ns satellite.util)
 
 (defonce thread-counter (java.util.concurrent.atomic.AtomicLong.))
 (defmacro thread
