@@ -28,7 +28,6 @@
                  [org.slf4j/slf4j-log4j12 "1.7.7"
                   :exclusions [log4j]]
                  [prismatic/plumbing "0.3.3"]
-                 [relay "0.1.0-20141010_085304-g435145a"]
                  [riemann "0.2.7"]]
   :aot [satellite.core]
   :main satellite.core

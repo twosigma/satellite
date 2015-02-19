@@ -2,9 +2,9 @@
   (:require [cheshire.core :as json]
             [clj-http.client :as client]
             [clojure.tools.logging :as log]
-            [relay.core :as relay]
             [riemann.core]
             [satellite.util :as util]
+            [satellite.relay :as relay]
             [satellite.services.stats]))
 
 (in-ns 'riemann.config)
