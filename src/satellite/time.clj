@@ -2,13 +2,13 @@
 (ns satellite.time)
 
 (defn seconds
-  [secs]
-  (* 1000 secs))
+  [ms]
+  (* 1000 ms))
 
 (defn minutes
-  [mins]
-  (* mins (seconds 60)))
+  [ms]
+  (* ms (seconds 60)))
 
 (defn hours
-  [hrs]
-  (* hrs (minutes 60)))
+  [ms]
+  (* ms (minutes 60)))
