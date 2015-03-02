@@ -72,8 +72,9 @@ curl satellite/stats.json
 Response:
 
 ```json
-{test-key: val1,
- second-key: va2
+{
+ "test-key": "val1",
+ "second-key": "val2"
 }
 ```
 
