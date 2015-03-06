@@ -28,7 +28,7 @@
                  [org.slf4j/slf4j-log4j12 "1.7.7"
                   :exclusions [log4j]]
                  [prismatic/plumbing "0.3.3"]
-                 [riemann "0.2.7"]]
+                 [riemann "0.2.8"]]
   :aot [satellite.core]
   :main satellite.core
   :aliases {"release-jar" ["do" "clean," "uberjar"]})
