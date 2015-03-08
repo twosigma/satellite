@@ -1,0 +1,4 @@
+.lein*
+.nrepl*
+/target
+/log
