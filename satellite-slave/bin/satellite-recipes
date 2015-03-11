@@ -1,0 +1,28 @@
+#!/bin/sh
+#exit immediately
+set -e
+cmd="$1"
+case "$cmd" in
+    "free-memory")
+        free -m | tr -s ' '| cut -d' ' -f4 | sed -n '2p'
+        ;;
+    "free-swap")
+        free -m | tr -s ' '| cut -d' ' -f4 | tail -n 1
+        ;;
+    "percentage-used")
+        df -Pl "$2" | tr -s ' ' | cut -d' ' -f5 | tail -n 1 | grep -o [0-9]*
+        ;;
+    "num-uninterruptable-processes")
+        ps -eo stat | grep 'D' | wc -l
+        ;;
+    "load-average")
+        uptime | tr -s ' ' '\n' | tail -n 1
+        ;;
+    "file-exists")
+        test -e "$2" && echo "$2"
+        ;;
+    *)
+        >&2 echo "No recipe for command $2"
+        exit 1
+        ;;
+esac
