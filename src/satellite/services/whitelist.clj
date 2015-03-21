@@ -5,7 +5,7 @@
             [satellite.time :as time]))
 
 (defn whitelist-host-flag-service
-  [cache curator zk-whitelist-path whitelist-hostname-pred host flag]
+  [manual-cache curator zk-whitelist-path whitelist-hostname-pred host flag]
   (resource
    :available-media-types ["text/html" "application/json"]
    :allowed-methods [:put]
@@ -26,23 +26,24 @@
    :put! (fn [ctx]
            (if (= flag "on")
              (do
-               (whitelist/on-host cache curator zk-whitelist-path host)
-               {::msg (str host "is now on.\n")})
+               (whitelist/on-host manual-cache curator zk-whitelist-path host)
+               {::msg (str host " is now on.\n")})
              (do
-               (whitelist/off-host cache curator zk-whitelist-path host)
-               {::msg (str host "is now off.\n")})))
+               (whitelist/off-host manual-cache curator zk-whitelist-path host)
+               {::msg (str host " is now off.\n")})))
    :handle-malformed (fn [ctx]
                        (::error ctx))
    :handle-created (fn [ctx]
                      (::msg ctx))))
 
 (defn whitelist-host-st-rm-service
-  [cache curator zk-whitelist-path host]
+  [whitelist-cache curator zk-whitelist-path host]
   (resource
    :available-media-types ["text/html" "application/json"]
    :allowed-methods [:get :delete]
+   :respond-with-entity? true
    :exists? (fn [ctx]
-              (when-let [flag (whitelist/get-host cache host)]
+              (when-let [flag (whitelist/get-host whitelist-cache host)]
                 (cond
                  (not (= :get (get-in ctx [:request :request-method]))) true
                  (= flag :on) [true {::msg "On\n"}]
@@ -51,17 +52,15 @@
                                (str "Get request retrieved status " flag))))))
    :delete! (fn [ctx]
               (whitelist/rm-host curator zk-whitelist-path host)
-              {::msg (str host " is now removed from the cluster.")})
+              {::msg (str host " was removed from the whitelist.\n")})
 
    :handle-ok (fn [ctx]
                 (::msg ctx))
-   :handle-no-content (fn [ctx]
-                        (::msg ctx))
    :handle-not-found (fn [ctx]
                        (::msg ctx))))
 
 (defn whitelist-list-service
-  [cache flag]
+  [whitelist-cache flag]
   (resource
    :available-media-types ["text/html" "application/json"]
    :allowed-methods [:get]
@@ -70,9 +69,9 @@
                    [true {::msg "Unsupported flag/filter."}]))
    :handle-ok (fn [ctx]
                 (let [hosts (condp = flag
-                              "on" (whitelist/get-on-hosts cache)
-                              "off" (whitelist/get-off-hosts cache)
-                              "all" (whitelist/get-all-hosts cache))]
+                              "on" (whitelist/get-on-hosts   whitelist-cache)
+                              "off" (whitelist/get-off-hosts whitelist-cache)
+                              "all" (whitelist/get-all-hosts whitelist-cache))]
                   (clojure.string/join "\n" (sort hosts))))
    :handle-malformed (fn [ctx]
                        (::msg ctx))))

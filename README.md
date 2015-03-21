@@ -23,13 +23,29 @@ Satellite currently serves three functions, each adding functionality to Mesos:
 2.  Satellite provides a REST interface for interacting with the Mesos master
     whitelist. The whitelist is a text file of hosts to which the master will
     consider sending tasks. Satellite ensures that update requests are consistent
-    across the Mesos masters.
+    across the Mesos masters. See `Whitelist` below for a more detailed
+    explanation of the model for interacting with the whitelist.
 
 3.  Satellite can provide a REST interface for accessing cached Mesos task
     metadata. To be very clear, Satellite does not cache the metadata, simply an
     interface to retrieve it, if it has been cached. This is useful if you have
-    persisted task metadata to get around the weak persistence guarantees 
+    persisted task metadata to get around the weak persistence guarantees
     currently offered by Mesos. This feature is optional.
+
+### Whitelist
+
+As we said above, the Mesos whitelist is a text file of hosts to which the
+master will consider sending tasks. Satellite adds two additional conceptual
+whitelists to the mix:
+
+1.  A managed whitelist: Hosts that have been entered automatically in response
+    to your Riemann configuration.
+2.  A manual whitelist: If a host is in this whitelist, its status overrides
+    that in the managed whitelist. This is to allow manual override. The
+    interface to this whitelist is in the PUT and DELETE REST endpoints.
+
+A periodic merge operation merges these two to the whitelist file that Mesos
+observes.
 
 ## Requirements
 
@@ -59,6 +75,10 @@ communication is unnecessary because the information from Slaves--host
 
 ## REST API
 
+Please rely on the status code and not the response body text. The latter is
+meant for humans and is very subject to change! If you believe either a status
+code or body could be improved, issues and pull requests are very welcome.
+
 ### `GET /stats.json`
 
 Return a JSONObject with  general statistics about the cluster.
@@ -76,6 +96,11 @@ Response:
  second-key: va2
 }
 ```
+
+### * `/whitelist`
+
+The `GET` endpoints expose the view that Mesos sees. The `PUT` and `DELETE`
+endpoints modify the manual whitelist.
 
 ### `GET /whitelist/{flag}`
 
@@ -146,7 +171,7 @@ On
 
 ### `DELETE /whitelist/host/{host}`
 
-Remove `host` from the inventory. Returns `204` on success. Returns `404` if
+Remove `host` from the manual whitelist. Returns `200` on success. Returns `404` if
 `host` was not in the inventory.
 
 Example:
@@ -160,13 +185,14 @@ curl -X DELETE example.com/whitelist/host/my.dope.host
 Response:
 
 ```
+my.dope.host was removed from the whitelist.
 ```
 
 ### `PUT /whitelist/host/{host}/{flag}`
 
-Set `host` to `flag`. If `host` is not currently in the inventory, `host` will
-be added. If `flag` is `on`, `host` will be added to the whitelist of each Mesos
-Master after passing validation.
+Override `host` to `flag`. If `host` is not currently in the manual whitelist,
+`host` will be added. If `flag` is `on`, `host` will be added to the whitelist
+of each Mesos Master after passing validation.
 
 For `host` to pass validation it must be
 

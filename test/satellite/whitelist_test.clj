@@ -99,3 +99,153 @@
         (update-host :critical curator "/test/" "my.dope.host")
         (is (= (read-string (String. (.. curator getData (forPath "/test/my.dope.host"))))
                :critical))))))
+
+(deftest merge-whitelist-caches!-test
+  (with-zk [zk]
+    (with-curator [zk curator]
+      (.start curator)
+      (doseq [path ["/whitelist" "/manual" "/managed"]]
+        (.. curator create (forPath path (byte-array 0))))
+      (let [[whitelist-state manual-state managed-state]
+            (map (fn [x] (atom 0)) (range 3))
+            whitelist (batch-sync curator "/whitelist" 100
+                                  (fn [_] (swap! whitelist-state inc)))
+            manual (batch-sync curator "/manual" 100
+                               (fn [_] (swap! manual-state inc)))
+            managed (batch-sync curator "/managed" 100
+                                (fn [_] (swap! managed-state inc)))]
+        (testing "basics"
+          (.. curator create (forPath "/manual/foo" (.getBytes (str :on))))
+          (.. curator create (forPath "/manual/baz" (.getBytes (str :on))))
+          (.. curator create (forPath "/managed/bar" (.getBytes (str :on))))
+          (.. curator create (forPath "/managed/baz" (.getBytes (str :off))))
+          (Thread/sleep 1000)
+          (merge-whitelist-caches! curator "/whitelist"
+                                   (:cache whitelist)
+                                   (:cache managed)
+                                   (:cache manual))
+          (Thread/sleep 1000)
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr (:cache whitelist))
+            (is (= (.toString wtr)
+                   "bar\nbaz\nfoo\n")))))))
+  (with-zk [zk]
+    (with-curator [zk curator]
+      (.start curator)
+      (doseq [path ["/whitelist" "/manual" "/managed"]]
+        (.. curator create (forPath path (byte-array 0))))
+      (let [[whitelist-state manual-state managed-state]
+            (map (fn [x] (atom 0)) (range 3))
+            whitelist (batch-sync curator "/whitelist" 100
+                                  (fn [_] (swap! whitelist-state inc)))
+            manual (batch-sync curator "/manual" 100
+                               (fn [_] (swap! manual-state inc)))
+            managed (batch-sync curator "/managed" 100
+                                (fn [_] (swap! managed-state inc)))]
+        (testing "no managed list"
+          (doseq [[path flag] (->> (interleave (repeat :on) (repeat :off))
+                                   (map vector (map char (range 97 107))))]
+            (.. curator create (forPath (str "/manual/" path) (.getBytes (str flag)))))
+          (Thread/sleep 1000)
+          (merge-whitelist-caches! curator "/whitelist"
+                                   (:cache whitelist)
+                                   (:cache managed)
+                                   (:cache manual))
+          (Thread/sleep 1000)
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr (:cache whitelist))
+            (is (= (.toString wtr)
+                   "a\nc\ne\ng\ni\n"))))
+        (testing "adding a managed list that is all overridden"
+          (doseq [[path flag] (->> (repeat :off)
+                                   (map vector (map char (range 97 107))))]
+            (.. curator create (forPath (str "/managed/" path) (.getBytes (str flag)))))
+          (Thread/sleep 1000)
+          (merge-whitelist-caches! curator "/whitelist"
+                                   (:cache whitelist)
+                                   (:cache managed)
+                                   (:cache manual))
+          (Thread/sleep 1000)
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr (:cache whitelist))
+            (is (= (.toString wtr)
+                   "a\nc\ne\ng\ni\n")))))))
+  (with-zk [zk]
+    (with-curator [zk curator]
+      (.start curator)
+      (doseq [path ["/whitelist" "/manual" "/managed"]]
+        (.. curator create (forPath path (byte-array 0))))
+      (let [[whitelist-state manual-state managed-state]
+            (map (fn [x] (atom 0)) (range 3))
+            whitelist (batch-sync curator "/whitelist" 100
+                                  (fn [_] (swap! whitelist-state inc)))
+            manual (batch-sync curator "/manual" 100
+                               (fn [_] (swap! manual-state inc)))
+            managed (batch-sync curator "/managed" 100
+                                (fn [_] (swap! managed-state inc)))]
+        (testing "start with nothing"
+          (Thread/sleep 1000)
+          (merge-whitelist-caches! curator "/whitelist"
+                                   (:cache whitelist)
+                                   (:cache managed)
+                                   (:cache manual))
+          (Thread/sleep 1000)
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr (:cache whitelist))
+            (is (= (.toString wtr)
+                   ""))))
+        (testing "adding a managed list that is half on"
+          (doseq [[path flag] (->> (interleave (repeat :on) (repeat :off))
+                                   (map vector (map char (range 97 107))))]
+            (.. curator create (forPath (str "/managed/" path) (.getBytes (str flag)))))
+          (Thread/sleep 1000)
+          (merge-whitelist-caches! curator "/whitelist"
+                                   (:cache whitelist)
+                                   (:cache managed)
+                                   (:cache manual))
+          (Thread/sleep 1000)
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr (:cache whitelist))
+            (is (= (.toString wtr)
+                   "a\nc\ne\ng\ni\n"))))
+        (testing "override everything"
+          (doseq [[path flag] (->> (repeat :on)
+                                   (map vector (map char (range 97 107))))]
+            (.. curator create (forPath (str "/manual/" path) (.getBytes (str flag)))))
+          (Thread/sleep 1000)
+          (merge-whitelist-caches! curator "/whitelist"
+                                   (:cache whitelist)
+                                   (:cache managed)
+                                   (:cache manual))
+          (Thread/sleep 1000)
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr (:cache whitelist))
+            (is (= (.toString wtr)
+                   "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n"))))
+        (testing "manually override first half to off"
+          (doseq [[path flag] (->> (repeat :off)
+                                   (map vector (map char (range 97 102))))]
+            (.. curator setData (forPath (str "/manual/" path) (.getBytes (str flag)))))
+          (Thread/sleep 1000)
+          (merge-whitelist-caches! curator "/whitelist"
+                                   (:cache whitelist)
+                                   (:cache managed)
+                                   (:cache manual))
+          (Thread/sleep 1000)
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr (:cache whitelist))
+            (is (= (.toString wtr)
+                   "f\ng\nh\ni\nj\n"))))
+        (testing "remove manual override for first half"
+          (doseq [path (map char (range 97 102))]
+            (.. curator delete (forPath (str "/manual/" path))))
+          (Thread/sleep 1000)
+          (merge-whitelist-caches! curator "/whitelist"
+                                   (:cache whitelist)
+                                   (:cache managed)
+                                   (:cache manual))
+          (Thread/sleep 1000)
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr (:cache whitelist))
+            (is (= (.toString wtr)
+                   "a\nc\ne\nf\ng\nh\ni\nj\n"))))))))

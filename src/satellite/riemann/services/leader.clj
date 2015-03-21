@@ -46,7 +46,7 @@
           (alter-var-root (var riemann.config/leader?)
                           (fn [leader?]
                             leader?*))
-          (reset! leader? leader?*)
+          (deliver leader? leader?*)
           (reset! close close-flag)
           (reset! watcher t)
           (.start t)))))
@@ -67,4 +67,4 @@
                           (assoc (meta stream!)
                             :stream!! stream!)))))
     (LeaderService. mesos-master-url (atom nil) leader
-                    (atom nil) (atom nil) (atom nil))))
+                    (promise) (atom nil) (atom nil))))

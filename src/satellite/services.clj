@@ -5,7 +5,7 @@
             [satellite.services.whitelist :as whitelist]))
 
 (defn service
-  [{:keys [bucket cache curator riak-conn
+  [{:keys [bucket whitelist-cache manual-cache curator riak-conn
            whitelist-hostname-pred
            zk-whitelist-path]}]
   (-> (compojure.core/routes
@@ -16,13 +16,13 @@
             (stats/stats))
        (ANY "/whitelist/host/:host" [host]
             (whitelist/whitelist-host-st-rm-service
-             cache
+             whitelist-cache
              curator
              zk-whitelist-path
              host))
        (ANY "/whitelist/host/:host/:flag" [host flag]
             (whitelist/whitelist-host-flag-service
-             cache
+             manual-cache
              curator
              zk-whitelist-path
              whitelist-hostname-pred
@@ -30,7 +30,7 @@
              flag))
        (ANY "/whitelist/:flag" [flag]
             (whitelist/whitelist-list-service
-             cache
+             whitelist-cache
              flag))
        (ANY "*" req
             (ring.util.response/not-found "Not a supported endpoint.")))))

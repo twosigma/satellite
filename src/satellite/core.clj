@@ -7,8 +7,10 @@
             [liberator.core :refer (resource)]
             [plumbing.core :refer (fnk)]
             [plumbing.graph :as graph]
+            [satellite.recipes]
             [satellite.riemann :as riemann]
             [satellite.riemann.monitor :as monitor]
+            [satellite.riemann.services.cache-merge]
             [satellite.riemann.services.curator]
             [satellite.riemann.services.http]
             [satellite.riemann.services.leader]
@@ -48,9 +50,11 @@
                                :max-sleep-time-ms 120000
                                :max-retries 10})
    ;; the path on disk to the Mesos whitelist
-   :local-whitelist-path (fnk [] "resources/whitelist")
-   ;; the path on Zookeeper to the whitelist coordination node
-   :zk-whitelist-path (fnk [] "/whitelist")
+   :local-whitelist-path (fnk [] "whitelist")
+   ;; the path on disk to put the manual Mesos whitelist
+   :local-manual-whitelist-path (fnk [] "manual-whitelist")
+   ;; the path on disk to put hte managed Mesos whitelist
+   :local-managed-whitelist-path (fnk [] "managed-whitelist")
    ;; predicate used to validate hosts that are added to the whitelist
    :whitelist-hostname-pred (fnk []
                                  (fn [hostname]
@@ -63,35 +67,88 @@
                    (when riak
                      (wc/connect (:endpoint riak))))
    :curator (fnk [[:settings zookeeper curator-retry-policy]]
-                 (satellite.riemann.services.curator/curator-service
-                  zookeeper curator-retry-policy))
+                 (riemann.config/service!
+                  (satellite.riemann.services.curator/curator-service
+                   zookeeper curator-retry-policy)))
    :leader (fnk [[:settings mesos-master-url]]
-                (satellite.riemann.services.leader/leader-service
-                 mesos-master-url))
-   :whitelist-sync (fnk [curator leader
-                         [:settings zk-whitelist-path local-whitelist-path]]
-                        (satellite.riemann.services.whitelist/whitelist-sync-service
-                         curator zk-whitelist-path
-                         local-whitelist-path @(:leader? leader)))
+                (riemann.config/service!
+                 (satellite.riemann.services.leader/leader-service
+                  mesos-master-url)))
+   ;; the path on Zookeeper to the whitelist coordination node
+   :zk-whitelist-path (fnk [] "/whitelist")
+   :zk-manual-whitelist-path (fnk [] "/manual-whitelist")
+   :zk-managed-whitelist-path (fnk [] "/managed-whitelist")
+   :whitelist-sync (fnk [curator leader zk-whitelist-path
+                         [:settings local-whitelist-path]]
+                        (riemann.config/service!
+                         (satellite.riemann.services.whitelist/whitelist-sync-service
+                          curator zk-whitelist-path
+                          local-whitelist-path local-whitelist-path
+                          (:leader? leader))))
+   :manual-whitelist-sync (fnk [curator leader zk-manual-whitelist-path
+                                [:settings local-manual-whitelist-path]]
+                               (riemann.config/service!
+                                (satellite.riemann.services.whitelist/whitelist-sync-service
+                                 curator zk-manual-whitelist-path
+                                 local-manual-whitelist-path nil
+                                 (:leader? leader))))
+   :managed-whitelist-sync (fnk [curator leader zk-managed-whitelist-path
+                                 [:settings
+                                  local-managed-whitelist-path
+                                  local-whitelist-path]]
+                                (let [managed-sync
+                                      (satellite.riemann.services.whitelist/whitelist-sync-service
+                                       curator zk-managed-whitelist-path
+                                       local-managed-whitelist-path local-whitelist-path
+                                       (:leader? leader))]
+                                  ;; see note in recipes
+                                  (future
+                                    (intern 'satellite.recipes
+                                            'on-host
+                                            (fn [host]
+                                              (whitelist/on-host
+                                               (:cache @(:syncer managed-sync))
+                                               @(:curator curator)
+                                               zk-managed-whitelist-path
+                                               host)))
+                                    (intern 'satellite.recipes
+                                            'off-host
+                                            (fn [host]
+                                              (whitelist/off-host
+                                               (:cache @(:syncer managed-sync))
+                                               @(:curator curator)
+                                               zk-managed-whitelist-path
+                                               host))))
+                                  (riemann.config/service! managed-sync)))
+   :cache-merge (fnk [curator zk-whitelist-path
+                      whitelist-sync managed-whitelist-sync manual-whitelist-sync]
+                     (riemann.config/service!
+                      (satellite.riemann.services.cache-merge/cache-merge-service
+                       curator zk-whitelist-path
+                       (:syncer whitelist-sync)
+                       (:syncer managed-whitelist-sync)
+                       (:syncer manual-whitelist-sync)
+                       (-> 1 time/seconds))))
    ;; if you want a riak-conn, do not start until you have it
    :http-service (fnk [[:settings
-                        service-host service-port riak zk-whitelist-path
+                        service-host service-port riak
                         whitelist-hostname-pred]
-                       curator riak-conn whitelist-sync]
-                      (satellite.riemann.services.http/http-service
-                       {:syncer (:syncer whitelist-sync)
-                        :curator (:curator curator)
-                        :riak riak
-                        :riak-conn riak-conn
-                        :whitelist-hostname-pred whitelist-hostname-pred
-                        :zk-whitelist-path zk-whitelist-path}
-                       service-host
-                       service-port))
-   :riemann-core (fnk [curator http-service leader whitelist-sync]
-                      (riemann.config/service! curator)
-                      (riemann.config/service! http-service)
-                      (riemann.config/service! leader)
-                      (riemann.config/service! whitelist-sync)
+                       curator riak-conn whitelist-sync manual-whitelist-sync
+                       zk-manual-whitelist-path]
+                      (riemann.config/service!
+                       (satellite.riemann.services.http/http-service
+                        {:syncer (:syncer whitelist-sync)
+                         :manual-syncer (:syncer manual-whitelist-sync)
+                         :curator (:curator curator)
+                         :riak riak
+                         :riak-conn riak-conn
+                         :whitelist-hostname-pred whitelist-hostname-pred
+                         :zk-whitelist-path zk-manual-whitelist-path}
+                        service-host
+                        service-port)))
+   :riemann-core (fnk [curator http-service leader whitelist-sync
+                       managed-whitelist-sync manual-whitelist-sync
+                       cache-merge]
                       riemann.config/core)
    :riemann (fnk [[:settings riemann-config] riemann-core]
                  (try
@@ -137,6 +194,7 @@
 (comment
   (init-logging)
   (def inst ((graph/eager-compile (app settings)) {}))
+  (def inst (-main "config/satellite-config.clj "))
   (@(:cli-server inst))
 
   (require 'riemann.core)

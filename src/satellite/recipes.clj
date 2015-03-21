@@ -4,12 +4,21 @@
    [riemann.streams :refer :all]
    [satellite.whitelist :as whitelist]))
 
-(defn on-host [host])
-(defn off-host [host])
+;; Forward declaration of on/off-host so they can be used in this namespace and
+;; accesible from the user defined riemann-config. The real defintion will occur
+;; at initialization. I prefer `defn' to `declare' here because in case the
+;; function gets called before it is truly defined (ie, there is a race) then I
+;; want to know about it.
+
+(defn on-host [host]
+  (warn "Tried to turn on" host "but on-host hasn't been defined yet"))
+(defn off-host [host]
+  (warn "Tried to turn off" host "but off-host hasn't been defined yet"))
 
 (def alive?
   (complement expired?))
 
+;; thank you to aphyr for showing us this
 (defn hysteresis?
   "Returns an event predicate which tests the metric of an event and allows
   for hysteresis.  Requires two predicates to test metrics: a trigger?

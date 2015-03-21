@@ -24,15 +24,20 @@
   (start! [this]
     (locking this
       (when-not @server
-        (let [{:keys [curator riak riak-conn syncer
+        (let [{:keys [curator riak riak-conn syncer manual-syncer
                       whitelist-hostname-pred
                       zk-whitelist-path]} handler-opts
-                      handler (services/service {:bucket (:bucket riak)
-                                         :cache  (:cache @syncer)
-                                         :curator @curator
-                                         :zk-whitelist-path zk-whitelist-path
-                                         :riak-conn riak-conn
-                                         :whitelist-hostname-pred whitelist-hostname-pred})]
+                      curator @curator
+                      whitelist-cache (:cache @syncer)
+                      manual-cache (:cache @manual-syncer)
+                      handler (services/service
+                               {:bucket (:bucket riak)
+                                :whitelist-cache whitelist-cache
+                                :manual-cache manual-cache
+                                :curator curator
+                                :zk-whitelist-path zk-whitelist-path
+                                :riak-conn riak-conn
+                                :whitelist-hostname-pred whitelist-hostname-pred})]
           (future
             (try
               (reset! server
@@ -41,10 +46,8 @@
                         :host (or host "127.0.0.1")
                         :ring-handler (-> handler
                                           wrap-params)
-                        :max-threads 10
-                                        ;:max-body 102400 ; 10 kb
-                                        ;:worker-name-prefix "satellite-httpkit-"
-                        }))
+                        :join? false
+                        :max-threads 10}))
               (catch Throwable t
                 (log/error t "http-kit failed")
                 (System/exit 17))))))))

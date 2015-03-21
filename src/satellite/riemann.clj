@@ -5,6 +5,11 @@
 ;; 1. Not initializing now redundant logging
 ;; 2. Including Satellite recipes in the rieman.config so they are available
 ;;    from the user-specified Riemann config
+;; 3. Modify the riemann.core/transition! funtion to not use pmap when starting;
+;;    the reason for this is that we depend on many Riemann Services that depend
+;;    on another Riemann Service and if you have few processors, the call to
+;;    pmap can block
+;;
 
 (ns satellite.riemann
   (:require [riemann.config]
@@ -14,6 +19,44 @@
             riemann.pubsub
             satellite.util)
   (:use clojure.tools.logging))
+
+(in-ns 'riemann.core)
+
+(defn transition!
+  "A core transition \"merges\" one core into another. Cores are immutable,
+  but the stateful resources associated with them aren't. When you call
+  (transition! old-core new-core), we:
+
+  1. Stop old core services without an equivalent in the new core.
+
+  2. Merge the new core's services with equivalents from the old core.
+
+  3. Reload all services with the merged core.
+
+  4. Start all services in the merged core.
+
+  Finally, we return the merged core. old-core and new-core can be discarded.
+
+  NB: This function is modified from the original at *"
+  [old-core new-core]
+  (let [merged (merge-cores old-core new-core)
+        old-services (set (core-services old-core))
+        merged-services (set (core-services merged))]
+
+    ; Stop old services
+    (dorun (pmap service/stop!
+                 (clojure.set/difference old-services merged-services)))
+
+    ; Reload merged services
+    (dorun (pmap #(service/reload! % merged) merged-services))
+
+    ; * Start merged services
+    (dorun (map #(future (service/start! %)) merged-services))
+
+    (info "Hyperspace core online")
+    merged))
+
+(in-ns 'satellite.riemann)
 
 (def config-file
   "The configuration file loaded by the bin tool"

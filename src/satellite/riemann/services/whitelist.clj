@@ -6,13 +6,15 @@
             [satellite.whitelist :as whitelist]))
 
 (defrecord WhitelistSyncService
-    [curator zk-whitelist-path local-whitelist-path leader? core syncer]
+    [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path
+     leader? core syncer]
   ServiceEquiv
   (equiv? [this other]
     (and (instance? WhitelistSyncService other)
          (= curator (:curator other))
          (= zk-whitelist-path (:zk-whitelist-path other))
          (= local-whitelist-path (:local-whitelist-path other))
+         (= initial-local-whitelist-path (:initial-local-whitelist-path other))
          (= leader? (:leader? other))))
   Service
   (conflict? [this other]
@@ -20,6 +22,7 @@
          (= curator (:curator other))
          (= zk-whitelist-path (:zk-whitelist-path other))
          (= local-whitelist-path (:local-whitelist-path other))
+         (= initial-local-whitelist-path (:initial-local-whitelist-path other))
          (= leader? (:leader? other))))
   (reload! [this new-core]
     (reset! core new-core))
@@ -31,9 +34,11 @@
         ;; zookeeper
         (let [curator @(:curator curator)]
           (when (and (not (.. curator checkExists (forPath zk-whitelist-path)))
-                     (leader?))
+                     (@leader?))
             (whitelist/initialize-whitelist
-             (clojure.java.io/reader local-whitelist-path)
+             (when (and initial-local-whitelist-path
+                        (.exists (java.io.File. initial-local-whitelist-path)))
+               (clojure.java.io/reader initial-local-whitelist-path))
              curator
              zk-whitelist-path))
           (let [batch-every (-> 10 time/seconds)
@@ -46,29 +51,15 @@
                                                        (whitelist/write-out-cache!
                                                         wtr
                                                         cache))))]
-            (deliver syncer batch-syncer)
-            (intern 'satellite.recipes
-                    'on-host
-                    (fn [host]
-                      (whitelist/on-host
-                       (:cache batch-syncer)
-                       curator
-                       zk-whitelist-path
-                       host)))
-            (intern 'satellite.recipes
-                    'off-host
-                    (fn [host]
-                      (whitelist/off-host
-                       (:cache batch-syncer)
-                       curator
-                       zk-whitelist-path
-                       host))))))))
+            (deliver syncer batch-syncer))))))
   (stop! [this]
     (locking this
       (.close (:cache @syncer))
       (async/close! (:sync @syncer)))))
 
 (defn whitelist-sync-service
-  [curator zk-whitelist-path local-whitelist-path leader?]
-  (WhitelistSyncService. curator zk-whitelist-path local-whitelist-path leader?
+  [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path
+   leader?]
+  (WhitelistSyncService. curator zk-whitelist-path local-whitelist-path
+                         initial-local-whitelist-path leader?
                          (atom nil) (promise)))

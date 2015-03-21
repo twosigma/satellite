@@ -184,7 +184,7 @@
   exist on the zookeeper.
 
   Arguments:
-      rdr: reader
+      rdr: reader or nil
       curator: Curator client
       zk-whitelist-path: path on zookeeper with host key-values
 
@@ -196,10 +196,11 @@
                     {:zk-whitelist-path zk-whitelist-path})))
   (log/info "Initializing whitelist")
   (.. curator create (forPath zk-whitelist-path (byte-array 0)))
-  (with-open [rdr rdr]
-    (doseq [host (line-seq rdr)]
-      (.. curator create (forPath (str zk-whitelist-path "/" host)
-                                  (.getBytes (str :on)))))))
+  (when rdr
+    (with-open [rdr rdr]
+      (doseq [host (line-seq rdr)]
+        (.. curator create (forPath (str zk-whitelist-path "/" host)
+                                    (.getBytes (str :on))))))))
 
 (defn update-host
   "Update host status on zookeeper.
@@ -305,3 +306,85 @@
    (not ((get-all-hosts cache) host)) nil
    ((get-on-hosts cache) host) :on
    :else :off))
+
+(defn write-to-zk!
+  [curator path bytes]
+  (try
+    (.. curator create (forPath path bytes))
+    (catch org.apache.zookeeper.KeeperException ex
+      (if (= (.code ex) org.apache.zookeeper.KeeperException$Code/NODEEXISTS)
+        (.. curator setData (forPath path bytes))
+        (throw ex)))))
+
+(defn merge-cd-into-whitelist!
+  "Take a childData and if different than what is in whitelist-cache, merge.
+
+  When we consider two childData, only apply the childData whose path is first.
+  Following merge semantics, cd-b is preferred to cd-a in case of equality.
+
+  Return the result of (compare host-a host-b) so caller knows who was synced."
+  ([curator zk-whitelist-path whitelist-cache cd]
+   (let [host (zkPath->host (.getPath cd))
+         path (str zk-whitelist-path "/" host)
+         whitelist-cd (.. whitelist-cache (getCurrentData path))]
+     ;; when not in inventory, or data is different
+     (when (or (nil? whitelist-cd)
+               (not (= (seq (.. whitelist-cd getData))
+                       (seq (.. cd getData)))))
+       (write-to-zk! curator path (.. cd getData)))
+     0))
+  ([curator zk-whitelist-path whitelist-cache cd-a cd-b]
+   (let [host-a (zkPath->host (.getPath cd-a))
+         host-b (zkPath->host (.getPath cd-b))
+         cmp (compare host-a host-b)]
+     ;; only do cd-a if comes before cd-b
+     (if (neg? cmp)
+       (merge-cd-into-whitelist! curator zk-whitelist-path whitelist-cache cd-a)
+       (merge-cd-into-whitelist! curator zk-whitelist-path whitelist-cache cd-b))
+     cmp)))
+
+(defn merge-whitelist-caches!
+  "Sync whitelist-cache with the managed and manual-caches. Choose manual cache
+  in case of conflict
+
+  Arguments:
+      curator: Curator client
+      zk-whitelist-path: String, prefix of whitelist-cache
+      whitelist-cache: PathChildrenCache, the cache of what Mesos interacts
+                       with, not public facing
+      managed-cache: PathChildrenCache, the automatically managed cache, public
+                     facing
+      manual-cache: PathChildrenCache, the manually managed cache, public facing
+
+  Returns
+      :done, when completed"
+  [curator zk-whitelist-path whitelist-cache managed-cache manual-cache]
+  (loop [[manual-cd  & manual-cds
+          :as manual-cdss]  (.getCurrentData manual-cache)
+          [managed-cd & managed-cds
+           :as managed-cdss] (.getCurrentData managed-cache)]
+    (cond
+      (and (nil? manual-cd)
+           (nil? managed-cd))
+      :done
+      (nil? manual-cd)
+      (recur managed-cdss
+             nil)
+      (nil? managed-cd)
+      (do (merge-cd-into-whitelist! curator zk-whitelist-path whitelist-cache
+                                    manual-cd)
+          (recur manual-cds
+                 nil))
+      :else
+      (let [cmp (merge-cd-into-whitelist! curator zk-whitelist-path whitelist-cache
+                                          managed-cd manual-cd)]
+        (cond
+          ;; peel managed
+          (neg? cmp) (recur manual-cdss
+                            managed-cds)
+          ;; peel manual
+          (pos? cmp) (recur manual-cds
+                            managed-cdss)
+          ;; peel both
+          :else (recur manual-cds
+                       managed-cds))))))
