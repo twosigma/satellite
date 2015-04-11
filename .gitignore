@@ -1,4 +1,4 @@
 .lein*
 .nrepl*
-/target
-/log
+*/target
+*/log
