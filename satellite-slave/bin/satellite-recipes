@@ -3,6 +3,12 @@
 set -e
 cmd="$1"
 case "$cmd" in
+    "memory-info")
+        free -m | awk '/Mem:/{ print $2 " " $3 " " $4 }'
+        ;;
+    "swap-info")
+        free -m | awk '/Swap:/{ print $2 " " $3 " " $4 }'
+        ;;
     "free-memory")
         free -m | tr -s ' '| cut -d' ' -f4 | sed -n '2p'
         ;;

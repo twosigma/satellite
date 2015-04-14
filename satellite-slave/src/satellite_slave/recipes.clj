@@ -39,6 +39,17 @@
                           (let [v (Integer/parseInt out)]
                             [(> v threshold) v]))}}})
 
+(defn free-swap-iff-swap
+  [threshold period]
+  {:riemann {:ttl (* 5 period)
+             :service "free swap in MB"}
+   :test {:command "satellite-recipes swap-info"
+          :schedule (every period)
+          :timeout 5
+          :output {:out (fn [out]
+                          (let [[configured used free] (map (fn [o] (Integer/parseInt o)) (split out #"\s+"))]
+                            [(or (= configured 0) (> free threshold)), free]))}}})
+
 (defn percentage-used
   [threshold path period]
   {:riemann {:ttl (* 5 period)
