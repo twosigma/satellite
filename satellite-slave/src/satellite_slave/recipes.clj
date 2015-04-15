@@ -47,8 +47,8 @@
           :schedule (every period)
           :timeout 5
           :output {:out (fn [out]
-                          (let [[configured used free] (map (fn [o] (Integer/parseInt o)) (split out #"\s+"))]
-                            [(or (= configured 0) (> free threshold)), free]))}}})
+                          (let [[configured used free] (map (fn [o] (Integer/parseInt o)) (clojure.string/split out #"\s+"))]
+                            [(or (= configured 0) (> free threshold)) free]))}}})
 
 (defn percentage-used
   [threshold path period]
