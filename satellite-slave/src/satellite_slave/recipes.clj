@@ -19,7 +19,7 @@
 
 (defn free-memory
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free memory in MB"}
    :test {:command "satellite-recipes free-memory"
           :schedule (every period)
@@ -30,7 +30,7 @@
 
 (defn free-swap
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free swap in MB"}
    :test {:command "satellite-recipes free-swap"
           :schedule (every period)
@@ -41,7 +41,7 @@
 
 (defn free-swap-iff-swap
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free swap in MB"}
    :test {:command "satellite-recipes swap-info"
           :schedule (every period)
@@ -52,7 +52,7 @@
 
 (defn percentage-used
   [threshold path period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service (str "percentage used of " path)}
    :test {:command (str "satellite-recipes percentage-used" path)
           :schedule (every period)
@@ -63,7 +63,7 @@
 
 (defn df-returns
   [timeout period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "df returns in timely fashion"}
    :test {:command "df"
           :schedule (every period)
@@ -72,7 +72,7 @@
 
 (defn num-uninterruptable-processes
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "number of processes in uninterruptable sleep"}
    :test {:command "satellite-recipes num-uninterruptable-processes"
           :schedule (every period)
@@ -82,7 +82,7 @@
 
 (defn load-average
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "load average over past 15 minutes"}
    :test {:command "satellite-recipes uptime"
           :schedule (every period)
@@ -92,7 +92,7 @@
 
 (defn file-exists
   [path period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service (str path "exists")}
    :test {:command (str "satellite-recipes file-exists" path)
           :schedule (every period)

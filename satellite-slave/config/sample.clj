@@ -12,7 +12,6 @@
                                                      (-> 60 t/seconds))
             (satellite-slave.recipes/num-uninterruptable-processes 10 (-> 60 t/seconds))
             (satellite-slave.recipes/load-average 30 (-> 60 t/seconds))
-            (satellite-slave.recipes.mesos/max-allowed-age 1 mesos-work-dir (-> 60 t/seconds))
             {:riemann {:ttl 300
                        :description "example test -- number of files/dirs in cwd"}
              :test {:command "sh -c ls | wc"
