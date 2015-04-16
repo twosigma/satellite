@@ -162,13 +162,13 @@
   (let [clients (map (fn [satellite]
                        (tcp-client satellite))
                      (:satellites settings))
-        env (case
+        env (cond
                 ;; safe-env not set or is false
                 (not (:safe-env settings)) (System/getenv)
                 ;; safe-env is a hash-map
                 (map? (:safe-env settings)) (:safe-env settings)
                 ;; safe-env is set but not a hash-map, default
-                (merge
+                :else (merge
                  (select-keys (System/getenv)
                               ["JAVA" "http_proxy" "https_proxy"
                                "no_proxy"])

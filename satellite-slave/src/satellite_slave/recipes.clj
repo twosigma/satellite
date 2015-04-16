@@ -17,11 +17,16 @@
             [clj-time.core :as t]
             [satellite-slave.util :refer [every]]))
 
+(defn make-recipe-cmd
+  [x & xs]
+  (str (:satellite-recipe-prefix settings) "/satellite-recipes " x (apply str xs))
+)
+
 (defn free-memory
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free memory in MB"}
-   :test {:command "satellite-recipes free-memory"
+   :test {:command (make-recipe-cmd "free-mem")
           :schedule (every period)
           :output {:out (fn [out]
                           (let [v (Integer/parseInt out)]
@@ -30,9 +35,9 @@
 
 (defn free-swap
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free swap in MB"}
-   :test {:command "satellite-recipes free-swap"
+   :test {:command (make-recipe-cmd "free-swap")
           :schedule (every period)
           :timeout 5
           :output {:out (fn [out]
@@ -41,9 +46,9 @@
 
 (defn free-swap-iff-swap
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free swap in MB"}
-   :test {:command "satellite-recipes swap-info"
+   :test {:command (make-recipe-cmd "swap-info")
           :schedule (every period)
           :timeout 5
           :output {:out (fn [out]
@@ -52,9 +57,9 @@
 
 (defn percentage-used
   [threshold path period]
-  {:riemann {:ttl (* 5 period)
-             :service (str "percentage used of " path)}
-   :test {:command (str "satellite-recipes percentage-used" path)
+  {:riemann {:ttl (* 5 (.getSeconds period))
+             :service (make-recipe-cmd  "percentage used of " path)}
+   :test {:command (make-recipe-cmd "percentage-used" path)
           :schedule (every period)
           :output {:out (fn [out]
                           (let [v (Integer/parseInt out)]
@@ -63,18 +68,18 @@
 
 (defn df-returns
   [timeout period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "df returns in timely fashion"}
-   :test {:command "df"
+   :test {:command "/bin/df"
           :schedule (every period)
           :output {:exit identity}
           :timeout timeout}})
 
 (defn num-uninterruptable-processes
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "number of processes in uninterruptable sleep"}
-   :test {:command "satellite-recipes num-uninterruptable-processes"
+   :test {:command (make-recipe-cmd "num-uninterruptable-processes")
           :schedule (every period)
           :output {:out (fn [out]
                           (let [v (Integer/parseInt out)]
@@ -82,9 +87,9 @@
 
 (defn load-average
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "load average over past 15 minutes"}
-   :test {:command "satellite-recipes uptime"
+   :test {:command (make-recipe-cmd "uptime")
           :schedule (every period)
           :output {:out (fn [out]
                           (let [v (Float/parseFloat out)]
@@ -92,8 +97,8 @@
 
 (defn file-exists
   [path period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service (str path "exists")}
-   :test {:command (str "satellite-recipes file-exists" path)
+   :test {:command (make-recipe-cmd "file-exists" path)
           :schedule (every period)
           :output {:exit identity}}})
