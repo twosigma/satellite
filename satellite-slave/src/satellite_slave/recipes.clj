@@ -58,8 +58,8 @@
 (defn percentage-used
   [threshold path period]
   {:riemann {:ttl (* 5 (.getSeconds period))
-             :service (make-recipe-cmd  "percentage used of " path)}
-   :test {:command (make-recipe-cmd "percentage-used" path)
+             :service (str "percentage used of " path)}
+   :test {:command (str "satellite-recipes percentage-used" path)
           :schedule (every period)
           :output {:out (fn [out]
                           (let [v (Integer/parseInt out)]
