@@ -19,8 +19,7 @@
 
 (defn make-recipe-cmd
   [x & xs]
-  (str (:satellite-recipe-prefix settings) "/satellite-recipes " x (apply str xs))
-)
+  (str (:satellite-recipe-prefix settings) (java.io.File/separator) "satellite-recipes " x (apply str xs)))
 
 (defn free-memory
   [threshold period]
