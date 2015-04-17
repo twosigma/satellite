@@ -170,26 +170,26 @@
                 ;; safe-env is set but not a hash-map, default
                 :else (merge
                  (select-keys (System/getenv)
-                               ["JAVA" "http_proxy" "https_proxy"
-                                "no_proxy"])
-                  {"PATH" "/bin/:/usr/bin/:/sbin/:/usr/sbin/"}))]
-        (doseq [{:keys [riemann test]} (:comets settings)]
-          ( chime-at (:schedule test)
-                (fn [_]
-                  (try
-                    (let [riemann (assoc riemann
-                                         :time (.toSeconds TimeUnit/MILLISECONDS
-                                                           (System/currentTimeMillis))
-                                         :service (str (:service settings)
-                                                       (:service riemann)))
-                          test-output (run-test (dissoc test :schedule))
-                          final-event (eventify riemann test-output)]
-                      (doseq [client clients]
-                        (send-event client final-event)))
-                    (catch Exception ex
-                      (log/error (str "service: " (:service riemann) " "
-                                      "command: " (:command test))
-                                 ex))))))
+                              ["JAVA" "http_proxy" "https_proxy"
+                               "no_proxy"])
+                 {"PATH" "/bin/:/usr/bin/:/sbin/:/usr/sbin/"}))]
+    (doseq [{:keys [riemann test]} (:comets settings)]
+      ( chime-at (:schedule test)
+                 (fn [_]
+                   (try
+                     (let [riemann (assoc riemann
+                                          :time (.toSeconds TimeUnit/MILLISECONDS
+                                                            (System/currentTimeMillis))
+                                          :service (str (:service settings)
+                                                        (:service riemann)))
+                           test-output (run-test (dissoc test :schedule))
+                           final-event (eventify riemann test-output)]
+                       (doseq [client clients]
+                         (send-event client final-event)))
+                     (catch Exception ex
+                       (log/error (str "service: " (:service riemann) " "
+                                       "command: " (:command test))
+                                  ex))))))
     (async/<!! finish-chan)))
 
 (defn init-logging
