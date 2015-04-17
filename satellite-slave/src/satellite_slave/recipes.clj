@@ -18,17 +18,17 @@
             [satellite-slave.util :refer [every]]))
 
 (defn make-recipe-cmd
-  [x & xs]
-  (str (:satellite-recipe-prefix settings) (java.io.File/separator) "satellite-recipes " x (apply str xs)))
+  [& xs]
+  ([(str "/home/tsram/satellite_slave" (java.io.File/separator) "satellite-recipes") xs]))
 
 (defn free-memory
   [threshold period]
   {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free memory in MB"}
-   :test {:command (make-recipe-cmd "free-mem")
+   :test {:command (make-recipe-cmd "free-memory")
           :schedule (every period)
           :output {:out (fn [out]
-                          (let [v (Integer/parseInt out)]
+                          (let [v (Integer/parseInt (clojure.string/trim out))]
                             [(> v threshold) v]))}
           :timeout 5}})
 
@@ -40,28 +40,28 @@
           :schedule (every period)
           :timeout 5
           :output {:out (fn [out]
-                          (let [v (Integer/parseInt out)]
+                          (let [v (Integer/parseInt (clojure.string/trim out))]
                             [(> v threshold) v]))}}})
 
 (defn free-swap-iff-swap
   [threshold period]
   {:riemann {:ttl (* 5 (.getSeconds period))
-             :service "free swap in MB"}
+             :service "free swap iff swap in MB"}
    :test {:command (make-recipe-cmd "swap-info")
           :schedule (every period)
           :timeout 5
           :output {:out (fn [out]
-                          (let [[configured used free] (map (fn [o] (Integer/parseInt o)) (clojure.string/split out #"\s+"))]
+                          (let [[configured used free] (map (fn [o] (Integer/parseInt (clojure.string/trim o))) (clojure.string/split out #"\s+"))]
                             [(or (= configured 0) (> free threshold)) free]))}}})
 
 (defn percentage-used
   [threshold path period]
   {:riemann {:ttl (* 5 (.getSeconds period))
              :service (str "percentage used of " path)}
-   :test {:command (str "satellite-recipes percentage-used" path)
+   :test {:command (make-recipe-cmd "percentage-used" path)
           :schedule (every period)
           :output {:out (fn [out]
-                          (let [v (Integer/parseInt out)]
+                          (let [v (Integer/parseInt (clojure.string/trim out))]
                             [(< v threshold) v]))}
           :timeout 5}})
 
@@ -81,17 +81,17 @@
    :test {:command (make-recipe-cmd "num-uninterruptable-processes")
           :schedule (every period)
           :output {:out (fn [out]
-                          (let [v (Integer/parseInt out)]
+                          (let [v (Integer/parseInt (clojure.string/trim out))]
                             [(< v threshold) v]))}}})
 
 (defn load-average
   [threshold period]
   {:riemann {:ttl (* 5 (.getSeconds period))
              :service "load average over past 15 minutes"}
-   :test {:command (make-recipe-cmd "uptime")
+   :test {:command (make-recipe-cmd "load-average")
           :schedule (every period)
           :output {:out (fn [out]
-                          (let [v (Float/parseFloat out)]
+                          (let [v (Float/parseFloat (clojure.string/trim out))]
                             [(< v threshold) v]))}}})
 
 (defn file-exists
