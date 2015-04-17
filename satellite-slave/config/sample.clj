@@ -3,7 +3,7 @@
 (def settings
   {:satellites [{:host "satellite.master.1.example.com"}
                 {:host "satellite.master.2.example.com"}]
-   :satellite-recipe-prefix "/home/satellite/satellite_slave/"
+   :satellite-recipe-prefix "/home/satellite/satellite_slave"
    :service "mesos/slave/"
    :comets [(satellite-slave.recipes/free-memory 50 (-> 60 t/seconds))
             (satellite-slave.recipes/free-swap   50 (-> 60 t/seconds))
