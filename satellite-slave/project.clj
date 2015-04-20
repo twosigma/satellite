@@ -24,4 +24,5 @@
                   :exclusions [log4j]]
                  [riemann-clojure-client "0.3.1"]]
   :aot [satellite-slave.core]
-  :main satellite-slave.core)
+  :main satellite-slave.core
+  :aliases {"release-jar" ["do" "clean," "uberjar"]}) 
