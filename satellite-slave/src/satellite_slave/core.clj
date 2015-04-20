@@ -132,8 +132,7 @@
                             (cond
                              (number? (:exit test-output)) (:exit test-output)
                              (number? (:out test-output)) (:out test-output)
-                             (default-pair? (:out test-output))
-                             (assoc riemann :metric (second (:out test-output)))
+                             (default-pair? (:out test-output)) (second (:out test-output))
                              (number? (:err test-output)) (:err test-output))]
                         (if metric
                           (assoc riemann :metric metric)
@@ -162,13 +161,13 @@
   (let [clients (map (fn [satellite]
                        (tcp-client satellite))
                      (:satellites settings))
-        env (case
+        env (cond
                 ;; safe-env not set or is false
                 (not (:safe-env settings)) (System/getenv)
                 ;; safe-env is a hash-map
                 (map? (:safe-env settings)) (:safe-env settings)
                 ;; safe-env is set but not a hash-map, default
-                (merge
+                :else (merge
                  (select-keys (System/getenv)
                               ["JAVA" "http_proxy" "https_proxy"
                                "no_proxy"])
@@ -188,8 +187,7 @@
                         (send-event client final-event)))
                     (catch Exception ex
                       (log/error (str "service: " (:service riemann) " "
-                                      "command: " (:command test))
-                                 ex))))))
+                                      "command: " (:command test) ex) ex))))))
     (async/<!! finish-chan)))
 
 (defn init-logging

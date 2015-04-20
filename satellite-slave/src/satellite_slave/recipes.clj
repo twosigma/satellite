@@ -17,83 +17,87 @@
             [clj-time.core :as t]
             [satellite-slave.util :refer [every]]))
 
+(defn make-recipe-cmd
+  [& xs]
+  (str "/home/tsram/satellite_slave" (java.io.File/separator) "satellite-recipes " (clojure.string/join " " xs)))
+
 (defn free-memory
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free memory in MB"}
-   :test {:command "satellite-recipes free-memory"
+   :test {:command (make-recipe-cmd "free-memory")
           :schedule (every period)
           :output {:out (fn [out]
-                          (let [v (Integer/parseInt out)]
+                          (let [v (Integer/parseInt (clojure.string/trim out))]
                             [(> v threshold) v]))}
           :timeout 5}})
 
 (defn free-swap
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "free swap in MB"}
-   :test {:command "satellite-recipes free-swap"
+   :test {:command (make-recipe-cmd "free-swap")
           :schedule (every period)
           :timeout 5
           :output {:out (fn [out]
-                          (let [v (Integer/parseInt out)]
+                          (let [v (Integer/parseInt (clojure.string/trim out))]
                             [(> v threshold) v]))}}})
 
 (defn free-swap-iff-swap
   [threshold period]
-  {:riemann {:ttl (* 5 period)
-             :service "free swap in MB"}
-   :test {:command "satellite-recipes swap-info"
+  {:riemann {:ttl (* 5 (.getSeconds period))
+             :service "free swap iff swap in MB"}
+   :test {:command (make-recipe-cmd "swap-info")
           :schedule (every period)
           :timeout 5
           :output {:out (fn [out]
-                          (let [[configured used free] (map (fn [o] (Integer/parseInt o)) (clojure.string/split out #"\s+"))]
+                          (let [[configured used free] (map (fn [o] (Integer/parseInt (clojure.string/trim o))) (clojure.string/split out #"\s+"))]
                             [(or (= configured 0) (> free threshold)) free]))}}})
 
 (defn percentage-used
   [threshold path period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service (str "percentage used of " path)}
-   :test {:command (str "satellite-recipes percentage-used" path)
+   :test {:command (make-recipe-cmd "percentage-used" path)
           :schedule (every period)
           :output {:out (fn [out]
-                          (let [v (Integer/parseInt out)]
+                          (let [v (Integer/parseInt (clojure.string/trim out))]
                             [(< v threshold) v]))}
           :timeout 5}})
 
 (defn df-returns
   [timeout period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "df returns in timely fashion"}
-   :test {:command "df"
+   :test {:command "/bin/df"
           :schedule (every period)
           :output {:exit identity}
           :timeout timeout}})
 
 (defn num-uninterruptable-processes
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "number of processes in uninterruptable sleep"}
-   :test {:command "satellite-recipes num-uninterruptable-processes"
+   :test {:command (make-recipe-cmd "num-uninterruptable-processes")
           :schedule (every period)
           :output {:out (fn [out]
-                          (let [v (Integer/parseInt out)]
+                          (let [v (Integer/parseInt (clojure.string/trim out))]
                             [(< v threshold) v]))}}})
 
 (defn load-average
   [threshold period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service "load average over past 15 minutes"}
-   :test {:command "satellite-recipes uptime"
+   :test {:command (make-recipe-cmd "load-average")
           :schedule (every period)
           :output {:out (fn [out]
-                          (let [v (Float/parseFloat out)]
+                          (let [v (Float/parseFloat (clojure.string/trim out))]
                             [(< v threshold) v]))}}})
 
 (defn file-exists
   [path period]
-  {:riemann {:ttl (* 5 period)
+  {:riemann {:ttl (* 5 (.getSeconds period))
              :service (str path "exists")}
-   :test {:command (str "satellite-recipes file-exists" path)
+   :test {:command (make-recipe-cmd "file-exists" path)
           :schedule (every period)
           :output {:exit identity}}})
