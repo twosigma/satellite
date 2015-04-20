@@ -19,7 +19,7 @@
 
 (defn make-recipe-cmd
   [& xs]
-  ([(str "/home/tsram/satellite_slave" (java.io.File/separator) "satellite-recipes") xs]))
+  (str "/home/tsram/satellite_slave" (java.io.File/separator) "satellite-recipes " (clojure.string/join " " xs)))
 
 (defn free-memory
   [threshold period]
