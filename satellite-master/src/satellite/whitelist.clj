@@ -5,6 +5,7 @@
            [clj-time.core :as t]
            [clj-time.periodic :as periodic]
            [satellite.services.stats :as stats]
+           [riemann.config]
            [riemann.core]
            [satellite.time :as time])
   (import org.apache.curator.framework.CuratorFrameworkFactory
@@ -15,7 +16,8 @@
           org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent$Type
           org.apache.curator.framework.recipes.cache.PathChildrenCacheListener
           org.apache.zookeeper.KeeperException
-          org.apache.zookeeper.KeeperException$Code))
+          org.apache.zookeeper.KeeperException$Code
+          java.util.concurrent.TimeUnit))
 
 ;; todo, move to Curator 2.7.0, use TreeCache, use CAS of hosts
 ;; this would allow scale for 10000x more hosts
@@ -232,7 +234,13 @@
     (when-not (pred state)
       (let [named-state (when-not (nil? state) (name (childData->enum state)))]
         (log/info "Turning" host named-state "->" (name flag))
-        (update-host flag curator zk-whitelist-path host)))))
+        (update-host flag curator zk-whitelist-path host)
+        (riemann.core/stream! @riemann.config/core
+                        {:metric (if (= flag :on) 1 -1)
+                         :service "satellite host count"
+                         :host host
+                         :time (.toSeconds TimeUnit/MILLISECONDS
+                                           (System/currentTimeMillis))})))))
 
 (defn on-host
   "Turn on host. WARNING: Only proceeds when cache says node is not already on."
