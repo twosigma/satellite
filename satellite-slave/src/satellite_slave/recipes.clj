@@ -27,9 +27,10 @@
              :service "free memory in MB"}
    :test {:command (make-recipe-cmd "free-memory")
           :schedule (every period)
-          :output {:out (fn [out]
-                          (let [v (Integer/parseInt (clojure.string/trim out))]
-                            [(> v threshold) v]))}
+          :output (fn [{:keys [out err exit]}]
+                    (let [v (Integer/parseInt (clojure.string/trim out))]
+                      {:state (if (> v threshold) "ok" "critical")
+                       :metric v}))
           :timeout 5}})
 
 (defn free-swap
@@ -39,9 +40,10 @@
    :test {:command (make-recipe-cmd "free-swap")
           :schedule (every period)
           :timeout 5
-          :output {:out (fn [out]
-                          (let [v (Integer/parseInt (clojure.string/trim out))]
-                            [(> v threshold) v]))}}})
+          :output (fn [{:keys [out err exit]}]
+                    (let [v (Integer/parseInt (clojure.string/trim out))]
+                      {:state (if (> v threshold) "ok" "critical")
+                       :metric v}[]))}})
 
 (defn free-swap-iff-swap
   [threshold period]
@@ -50,9 +52,13 @@
    :test {:command (make-recipe-cmd "swap-info")
           :schedule (every period)
           :timeout 5
-          :output {:out (fn [out]
-                          (let [[configured used free] (map (fn [o] (Integer/parseInt (clojure.string/trim o))) (clojure.string/split out #"\s+"))]
-                            [(or (= configured 0) (> free threshold)) free]))}}})
+          :output (fn [{:keys [out err exit]}]
+                    (let [->int (fn [o]
+                                  (Integer/parseInt (clojure.string/trim o)))
+                          [configured used free]
+                          (map ->int (clojure.string/split out #"\s+"))]
+                      {:state (or (= configured 0) (> free threshold))
+                       :metric free}))}})
 
 (defn percentage-used
   [threshold path period]
@@ -60,10 +66,11 @@
              :service (str "percentage used of " path)}
    :test {:command (make-recipe-cmd "percentage-used" path)
           :schedule (every period)
-          :output {:out (fn [out]
-                          (let [v (Integer/parseInt (clojure.string/trim out))]
-                            [(< v threshold) v]))}
-          :timeout 5}})
+          :timeout 5
+          :output (fn [{:keys [out err exit]}]
+                    (let [v (Integer/parseInt (clojure.string/trim out))]
+                      {:state (if (< v threshold) "ok" "critical")
+                       :metric v}))}})
 
 (defn df-returns
   [timeout period]
@@ -71,8 +78,10 @@
              :service "df returns in timely fashion"}
    :test {:command "/bin/df"
           :schedule (every period)
-          :output {:exit identity}
-          :timeout timeout}})
+          :timeout timeout
+          :output (fn [{:keys [out exit err]}]
+                    {:state (zero? exit) "ok" "critical"
+                     :metric exit})}})
 
 (defn num-uninterruptable-processes
   [threshold period]
@@ -80,9 +89,10 @@
              :service "number of processes in uninterruptable sleep"}
    :test {:command (make-recipe-cmd "num-uninterruptable-processes")
           :schedule (every period)
-          :output {:out (fn [out]
-                          (let [v (Integer/parseInt (clojure.string/trim out))]
-                            [(< v threshold) v]))}}})
+          :output (fn [{:keys [out err exit]}]
+                    (let [v (Integer/parseInt (clojure.string/trim out))]
+                      {:state (if (< v threshold) "ok" "critical")
+                       :metric v}))}})
 
 (defn load-average
   [threshold period]
@@ -90,9 +100,10 @@
              :service "load average over past 15 minutes"}
    :test {:command (make-recipe-cmd "load-average")
           :schedule (every period)
-          :output {:out (fn [out]
-                          (let [v (Float/parseFloat (clojure.string/trim out))]
-                            [(< v threshold) v]))}}})
+          :output (fn [{:keys [out err exit]}]
+                    (let [v (Float/parseFloat (clojure.string/trim out))]
+                      {:state (< v threshold) "ok" "critical"
+                       :metric v}))}})
 
 (defn file-exists
   [path period]
@@ -100,4 +111,6 @@
              :service (str path "exists")}
    :test {:command (make-recipe-cmd "file-exists" path)
           :schedule (every period)
-          :output {:exit identity}}})
+          :output (fn [{:keys [out err exit]}
+                       {:state (zero? exit) "ok" "critical"
+                        :metric exit}])}})

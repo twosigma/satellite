@@ -17,7 +17,8 @@
                        :description "example test -- number of files/dirs in cwd"}
              :test {:command "sh -c ls | wc"
                     :schedule (every (-> 60 t/seconds))
-                    :output {:out (fn [out]
-                                    (-> (clojure.string/split #"\s+")
-                                        first
-                                        (Integer/parseInt)))}}}]})
+                    :output (fn [{:keys [out err exit]}
+                                 (-> out
+                                     (clojure.string/split #"\s+")
+                                     first
+                                     (Integer/parseInt))])}}]})

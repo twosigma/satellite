@@ -61,17 +61,8 @@
   (let [cmd (if (instance? String (:command t))
               (clojure.string/split (:command t) #"\s+")
               (:command t))]
-    (try
-      (let [output (apply sh-timeout (or (:timeout t) 10) cmd)
-            expected-m (:output t)
-            expected-ks (keys expected-m)]
-        (reduce
-         (fn [acc k]
-           (update-in acc [k] check-output (expected-m k)))
-         (select-keys output expected-ks)
-         expected-ks))
-      (catch java.util.concurrent.TimeoutException ex
-        {:timed-out true}))))
+    (let [output (apply sh-timeout (or (:timeout t) 10) cmd)]
+      ((:output t) output))))
 
 (def typical-riemann-key?
   #{:host :service :state :time
@@ -82,79 +73,15 @@
   (or (true? x)
       (false? x)))
 
-(defn sensible-riemann-event
-  "The default function to construct a Riemann event from the test output.
-
-  There is default behavior for the state field in 3 cases, in priority:
-    1- There is a value for :exit; if 0, then 'ok' else 'critical'
-    2- :out is a boolean value; if true, then 'ok' else 'critical'
-    3- :out is a (bool, number) pair; if bool, then 'ok' else 'critical'
-
-  The default behavior for the metric field in 4 cases, in priority:
-    1- If :exit is a number, then return it
-    2- If :out is a nubmer, then return it
-    3- If :out is a (bool, number) pair, then return number
-    4- If :err is a number, then return it
-
-  Arguments:
-      riemann: riemann-event
-      test-output:
-
-  Output:
-      riemann-event, possibly with metric and state"
-  [riemann test-output]
-  (if (:timed-out test-output)
-    (assoc riemann :state "critical")
-    (let [default-pair? (fn [x] (and (coll? x)
-                                     (= (count x) 2)
-                                     (map #(% %2) [bool? number?] x)))
-          state-fn (fn [riemann test-output]
-                     (cond
-                      (:exit test-output) (assoc riemann
-                                            :state
-                                            (if (zero? (:exit test-output))
-                                              "ok"
-                                              "critical"))
-                      (bool? (:out test-output)) (assoc riemann
-                                                   :state
-                                                   (if (:out test-output)
-                                                     "ok"
-                                                     "critical"))
-                      (default-pair? (:out test-output))
-                      (assoc riemann
-                        :state
-                        (if (first (:out test-output))
-                          "ok"
-                          "critical"))
-                      :else riemann))
-          metric-fn (fn [riemann test-output]
-                      (let [metric
-                            (cond
-                             (number? (:exit test-output)) (:exit test-output)
-                             (number? (:out test-output)) (:out test-output)
-                             (default-pair? (:out test-output)) (second (:out test-output))
-                             (number? (:err test-output)) (:err test-output))]
-                        (if metric
-                          (assoc riemann :metric metric)
-                          riemann)))]
-      (-> riemann
-          (state-fn test-output)
-          (metric-fn test-output)))))
-
-(defn eventify
-  "Construct a Riemann event, either using the user specified function
-  corresponding to :eventify or by using our default."
-  [riemann test-output]
-  (let [event (-> (if-let [event-fn (:eventify test-output)]
-                    (event-fn riemann test-output)
-                    (sensible-riemann-event riemann test-output)))]
-    ;; make a string of each value belonging to a non-special key
-    (reduce
-     (fn [acc k]
-       (update-in acc [k] str))
-     event
-     (filter (complement typical-riemann-key?)
-             (keys event)))))
+(defn stringify
+  "Make a string of each value belonging to a non-special key"
+  [event]
+  (reduce
+   (fn [acc k]
+     (update-in acc [k] str))
+   event
+   (filter (complement typical-riemann-key?)
+           (keys event))))
 
 (defn app
   [settings finish-chan]
@@ -181,10 +108,14 @@
                                                       (System/currentTimeMillis))
                                     :service (str (:service settings)
                                                   (:service riemann)))
-                          test-output (run-test (dissoc test :schedule))
-                          final-event (eventify riemann test-output)]
+                          test-output (try
+                                        (run-test (dissoc test :schedule))
+                                        (catch java.util.concurrent.TimeoutException ex
+                                          {:state "critical"
+                                           :description "timed out"}))
+                          complete-event (stringify (merge riemann test-output))]
                       (doseq [client clients]
-                        (send-event client final-event)))
+                        (send-event client complete-event)))
                     (catch Exception ex
                       (log/error (str "service: " (:service riemann) " "
                                       "command: " (:command test) ex) ex))))))
