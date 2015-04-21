@@ -20,10 +20,10 @@
   (start! [this]
     (locking this
       (when-not @watcher
-        (let [close-flag (atom nil)
+        (let [close (:close this)
               t (Thread. (fn []
                            (loop []
-                             (when-not @close-flag
+                             (when-not @close
                                (try
                                  (let [response (client/get
                                                  (str mesos-master-url "/master/state.json")
@@ -32,7 +32,7 @@
                                        pid (get-in response [:body "pid"])]
                                    (reset! leader (= leader-pid pid)))
                                  (catch Exception ex
-                                   (log/error (str "Requesting stats.json failed from: "
+                                   (log/error (str "Requesting state.json failed from: "
                                                    mesos-master-url)
                                               ex)))
                                (try
@@ -47,7 +47,6 @@
                           (fn [leader?]
                             leader?*))
           (deliver leader? leader?*)
-          (reset! close close-flag)
           (reset! watcher t)
           (.start t)))))
   (stop! [this]

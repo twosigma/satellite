@@ -1,4 +1,4 @@
-(def mesos-work-dir "/data/scratch/local/mesos/jobs")
+(def mesos-work-dir "/tmp/mesos")
 
 (def settings
   {:satellites [{:host "satellite.master.1.example.com"}
@@ -13,11 +13,14 @@
                                                      (-> 60 t/seconds))
             (satellite-slave.recipes/num-uninterruptable-processes 10 (-> 60 t/seconds))
             (satellite-slave.recipes/load-average 30 (-> 60 t/seconds))
-            {:riemann {:ttl 300
-                       :description "example test -- number of files/dirs in cwd"}
-             :test {:command "sh -c ls | wc"
-                    :schedule (every (-> 60 t/seconds))
-                    :output {:out (fn [out]
-                                    (-> (clojure.string/split #"\s+")
-                                        first
-                                        (Integer/parseInt)))}}}]})
+            {:command ["echo" "17"]
+             :schedule (every (-> 60 t/seconds))
+             :output (fn [{:keys [out err exit]}]
+                       (let [v (-> out
+                                   (clojure.string/split #"\s+")
+                                   first
+                                   (Integer/parseInt))]
+                         {:state "ok"
+                          :metric v
+                          :ttl 300
+                          :description "example test -- number of files/dirs in cwd"}))}]})

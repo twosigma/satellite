@@ -26,7 +26,7 @@
    ;;
    ;; where Riemann-map is a typical Riemann map with the following default
    ;; values:
-   ;;     hostname: will be resolved by hostname(1)
+   ;;     host: will be resolved by hostname(1)
    ;;     time: will be approximately time command was run.
    ;;
    ;; and Test-map has the following schema
@@ -52,21 +52,21 @@
    ;; which is to say, either a unary function or a value. If it is function, it
    ;; is applied to the command output for the corresponding key. If it is a
    ;; value, the command output is tested for equality against it.
-   :comets [{:riemann {:hostname "dope.host"
-                       :ttl 60}
-             :test {:command "echo Hello"
-                    :output {:out "Hello\n"}
-                    :timeout 30
-                    :schedule (every (-> 3 t/seconds))}}
-            {:riemann {:ttl 40
-                       :tags ["pink" "pig"]}
-             :test {:command ["ls" "-l"]
-                    :schedule (every (-> 10 t/seconds))}}
-            {:riemann {:ttl 20
-                       :tags ["yellow" "pig"]}
-             :test {:command ["ls" "-l"]
-                    :output {:exit (fn [ret] (+ ret 17))}
-                    :schedule (every (-> 17 t/seconds))}}]
+   :comets [{:command "echo Hello"
+             :output {:out "Hello\n"}
+             :timeout 30
+             :schedule (every (-> 3 t/seconds))
+             :host "dope.host"
+             :ttl 60}
+            {:command ["ls" "-l"]
+             :schedule (every (-> 10 t/seconds))
+             :ttl 40
+             :tags ["pink" "pig"]}
+            {:command ["ls" "-l"]
+             :output {:exit (fn [ret] (+ ret 17))}
+             :schedule (every (-> 17 t/seconds))
+             :ttl 20
+             :tags ["yellow" "pig"]}]
    :safe-env true})
 
 (defn include
