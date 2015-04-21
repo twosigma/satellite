@@ -1,4 +1,4 @@
-(defproject satellite "0.1.0-SNAPSHOT"
+(defproject satellite-master "0.1.0-SNAPSHOT"
   :description "Monitoring and alerting for Mesos"
   :url "http://github.com/twosigma/satellite"
   :license {:name "Apache License, Version 2.0"

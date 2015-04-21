@@ -116,6 +116,7 @@
                       (doseq [client clients]
                         (try
                           (send-event client riemann-event)
+                          (log/debug (format "Sent event: %s" riemann-event))
                           (catch Exception ex
                             (log/error (str "service: " (:service riemann-event) " "
                                             "command: " (:command test) ex) ex)))))
