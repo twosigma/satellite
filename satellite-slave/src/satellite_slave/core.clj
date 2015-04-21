@@ -99,26 +99,28 @@
                               ["JAVA" "http_proxy" "https_proxy"
                                "no_proxy"])
                  {"PATH" "/bin/:/usr/bin/:/sbin/:/usr/sbin/"}))]
-    (doseq [{:keys [riemann test]} (:comets settings)]
+    (doseq [test (:comets settings)]
       (chime-at (:schedule test)
                 (fn [_]
                   (try
-                    (let [riemann (assoc riemann
-                                    :time (.toSeconds TimeUnit/MILLISECONDS
-                                                      (System/currentTimeMillis))
-                                    :service (str (:service settings)
-                                                  (:service riemann)))
-                          test-output (try
-                                        (run-test (dissoc test :schedule))
+                    (let [riemann-event (try
+                                          (run-test (dissoc test :schedule))
                                         (catch java.util.concurrent.TimeoutException ex
                                           {:state "critical"
                                            :description "timed out"}))
-                          complete-event (stringify (merge riemann test-output))]
+                          riemann-event (assoc riemann-event
+                                               :time (.toSeconds TimeUnit/MILLISECONDS
+                                                                 (System/currentTimeMillis))
+                                               :service (str (:service settings)
+                                                             (:service riemann-event)))]
                       (doseq [client clients]
-                        (send-event client complete-event)))
+                        (try
+                          (send-event client riemann-event)
+                          (catch Exception ex
+                            (log/error (str "service: " (:service riemann-event) " "
+                                            "command: " (:command test) ex) ex)))))
                     (catch Exception ex
-                      (log/error (str "service: " (:service riemann) " "
-                                      "command: " (:command test) ex) ex))))))
+                      (log/error (str "command: " (:command test) ex) ex))))))
     (async/<!! finish-chan)))
 
 (defn init-logging

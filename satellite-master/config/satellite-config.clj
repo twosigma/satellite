@@ -6,5 +6,5 @@
      (fnk [] (url/url "http://localhost:5050"))
      :riak (fnk [] nil)
      :sleep-time (fnk [] 5000)
-     :zookeeper (fnk [] "localhost:2181")
+     :zookeeper (fnk [] "10.176.0.79:2181")
      }))
