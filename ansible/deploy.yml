@@ -15,8 +15,11 @@
     - name: copy slave jar
       copy: src={{ reporoot }}/satellite-slave/target/{{ slave_jar }} dest=~/
 
+- name: configure masters
+  hosts: satellite-masters
+      
 # edit config files
-
+- name: configure slaves
 # place satellite-recipes binary on $PATH
       
 - name: restart masters

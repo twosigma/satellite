@@ -1,0 +1,17 @@
+- name: fill in master config
+  hosts: satellite-masters
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: find leader
+      local_action: uri url=http://{{ ansible_ssh_host }}:5050/master/state.json
+      register: json_out
+      
+    # - set_fact:
+    #     mesos_leader: "{{ json_out.leader | from_json  }}"
+      
+    - name: place config
+      template: src={{ reporoot }}/satellite-master/config/satellite-config.clj.j2 dest=~/foo.clj
+
+  
