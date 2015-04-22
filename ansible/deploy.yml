@@ -1,0 +1,54 @@
+- name: install masters
+  hosts: satellite-masters
+  vars_files:
+    - vars.yml     
+  tasks:
+    - name: copy master jar
+      copy: src={{ reporoot }}/satellite-master/target/{{ master_jar }} dest=~/
+
+      
+- name: install slaves
+  hosts: satellite-slaves
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: copy slave jar
+      copy: src={{ reporoot }}/satellite-slave/target/{{ slave_jar }} dest=~/
+
+# edit config files
+
+# place satellite-recipes binary on $PATH
+      
+- name: restart masters
+  hosts: satellite-masters
+  vars_files:
+    - vars.yml
+  vars:
+    initfile_args: -jar {{ master_jar }}
+  tasks:
+    - name: place init script
+      template: src={{ reporoot }}/ansible/satellite.j2 dest=~/satellite mode=0755
+    
+    - name: stop masters
+      command: ~/satellite stop
+
+    - name: start masters
+      command: ~/satellite start -jar {{ master_jar }}
+
+      
+- name: restart slaves
+  hosts: satellite-slaves
+  vars_files:
+    - vars.yml
+  vars:
+    initfile_args: -jar {{ slave_jar }}
+  tasks:
+    - name: place init script
+      template: src={{ reporoot }}/ansible/satellite.j2 dest=~/satellite mode=0755
+    
+    - name: stop slaves
+      command: ~/satellite stop
+
+    - name: start slaves
+      command: ~/satellite start -jar {{ slave_jar }}
+

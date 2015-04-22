@@ -1,0 +1,9 @@
+[satellite-masters]
+sat-master1 ansible_ssh_host=10.176.0.79 ansible_ssh_user=jclouds
+sat-master2 ansible_ssh_host=10.165.223.247 ansible_ssh_user=jclouds
+sat-master3 ansible_ssh_host=10.192.76.84 ansible_ssh_user=jclouds
+
+[satellite-slaves]
+sat-slave1 ansible_ssh_host=10.97.125.65 ansible_ssh_user=jclouds
+sat-slave2 ansible_ssh_host=10.38.109.247 ansible_ssh_user=jclouds
+sat-slave3 ansible_ssh_host=10.11.153.148 ansible_ssh_user=jclouds

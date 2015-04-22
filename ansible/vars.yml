@@ -1,0 +1,6 @@
+---
+master_jar: satellite-0.1.0-SNAPSHOT-standalone.jar
+slave_jar: satellite-slave-0.1.0-SNAPSHOT-standalone.jar
+pid_file: satellite.pid
+start_script: satellite
+binary: java
