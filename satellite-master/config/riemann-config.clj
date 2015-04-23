@@ -31,4 +31,4 @@
         (coalesce (* 60 5)
                   prn
                   (where* (fn [es] (< (:metric (folds/sum es)) 10)
-                          (email "foo@example.com")))))
+                          (email "foo@example.com"))))))
