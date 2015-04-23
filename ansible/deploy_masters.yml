@@ -1,0 +1,28 @@
+- name: deploy masters
+  hosts: satellite_masters
+  gather_facts: false
+  vars_files:
+    - vars.yml     
+  vars:
+     initfile_args: -jar {{ master_jar }} {{ master_config_file }}
+#    initfile_args: -version
+  tasks:
+    - name: copy master jar
+      copy: src={{ reporoot }}/satellite-master/target/{{ master_jar }} dest=~/
+
+    - name: place masters config
+      template: src={{ reporoot }}/satellite-master/config/{{ master_config_file }}.j2 dest=~/{{ master_config_file }}
+
+    - name: place init script
+      template: src={{ reporoot }}/ansible/satellite.j2 dest=~/satellite mode=0755
+
+    - name: place riemann config
+      copy: src={{ reporoot }}/satellite-master/config/riemann-config.clj dest=~/
+      
+    - name: restart masters
+      shell: ~/satellite restart
+#      register: init_output
+
+#    - debug: var=init_output
+
+

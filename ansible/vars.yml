@@ -1,0 +1,9 @@
+---
+master_jar: satellite-0.1.0-SNAPSHOT-standalone.jar
+slave_jar: satellite-slave-0.1.0-SNAPSHOT-standalone.jar
+pid_file: satellite.pid
+start_script: satellite
+binary: java
+master_config_file: satellite-config.clj
+slave_config_file: satellite-slave-config.clj
+bin_dir: ~/bin
