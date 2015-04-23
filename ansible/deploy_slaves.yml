@@ -1,0 +1,26 @@
+- name: deploy slaves
+  hosts: satellite_slaves
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  vars:
+    initfile_args: -jar {{ slave_jar }} {{ slave_config_file }}
+  tasks:
+    - name: copy slave jar
+      copy: src={{ reporoot }}/satellite-slave/target/{{ slave_jar }} dest=~/
+
+    - name: place slaves config
+      template: src={{ reporoot }}/satellite-slave/config/{{ slave_config_file }}.j2 dest=~/{{ slave_config_file }}
+
+    - name: place slaves init script
+      template: src={{ reporoot }}/ansible/satellite.j2 dest=~/satellite mode=0755
+
+    - name: place recipes script
+      copy: src={{ reporoot }}/satellite-slave/bin/satellite-recipes dest={{ bin_dir }} mode=0755
+
+    - name: restart slaves 
+      shell: ~/satellite restart
+#      register: restart_output
+
+#    - debug: var=restart_output
+

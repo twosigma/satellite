@@ -1,7 +1,7 @@
 (def mesos-work-dir "/tmp/mesos")
 
 (def settings
-  {:satellites [{% for master in groups[satellite-masters] %}
+  {:satellites [{% for master in groups['satellite_masters'] %}
                 {:host "{{ hostvars[master]['ansible_ssh_host']}}"}
                 {% endfor %}]
    :satellite-recipe-prefix "/home/{{ ansible_ssh_user }}/satellite_slave"

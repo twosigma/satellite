@@ -20,7 +20,11 @@ echoGreen() { echo -e "${green}$1${reset}"; }
 echoYellow() { echo -e "${yellow}$1${reset}"; }
 
 start() {
-  PID=`$DAEMON $ARGS > {{ start_script }}.log 2>&1 & echo $!`
+    mkdir -p {{ bin_dir }}
+    export PATH=$PATH:{{ bin_dir }}
+    nohup $DAEMON $ARGS > {{ start_script }}.log 2>&1 &
+    PID=$!
+    disown -a
 }
 
 case "$1" in
@@ -36,8 +40,7 @@ start)
     else
         start
     fi
-
-    if [ -z $PID ]; then
+    if [ -z "`ps axf | grep ${PID} | grep -v grep`" ]; then
         echoRed "Failed starting"
         exit 3
     else
@@ -52,7 +55,7 @@ status)
         PID=`cat $PID_FILE`
         if [ -z "`ps axf | grep ${PID} | grep -v grep`" ]; then
             echoRed "Not running (process dead but pidfile exists)"
-            exit 1
+            exit 0
         else
             echoGreen "Running [$PID]"
             exit 0
@@ -68,10 +71,12 @@ stop)
         PID=`cat $PID_FILE`
         if [ -z "`ps axf | grep ${PID} | grep -v grep`" ]; then
             echoRed "Not running (process dead but pidfile exists)"
+            echoYellow "Removing pidfile."
+            rm $PID_FILE
             exit 1
         else
             PID=`cat $PID_FILE`
-            kill -HUP $PID
+            kill $PID
             echoGreen "Stopped [$PID]"
             rm -f $PID_FILE
             exit 0
