@@ -15,7 +15,10 @@
 
     - name: place init script
       template: src={{ reporoot }}/ansible/satellite.j2 dest=~/satellite mode=0755
-    
+
+    - name: place riemann config
+      copy: src={{ reporoot }}/satellite-master/config/riemann-config.clj dest=~/
+      
     - name: restart masters
       shell: ~/satellite restart
 #      register: init_output

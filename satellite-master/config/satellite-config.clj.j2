@@ -6,5 +6,6 @@
      (fnk [] (url/url "http://{{ ansible_ssh_host }}:5050"))
      :riak (fnk [] nil)
      :sleep-time (fnk [] 5000)
+     :riemann-config (fnk [] "/home/jclouds/riemann-config.clj")
      :zookeeper (fnk [] "{{ ansible_ssh_host }}:2181")
      }))
