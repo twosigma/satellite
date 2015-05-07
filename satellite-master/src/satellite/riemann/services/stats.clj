@@ -2,7 +2,7 @@
   (:require [riemann.config]))
 
 (defrecord StatsHTTPService
-    [core stats]
+           [core stats]
   ServiceEquiv
   (equiv? [this other]
     (instance? StatsHTTPService other))

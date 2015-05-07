@@ -40,31 +40,31 @@
                        (do
                          (log/info "Host added")
                          (async/go
-                          (async/>! sync-ch :update)))
+                           (async/>! sync-ch :update)))
                        PathChildrenCacheEvent$Type/CHILD_REMOVED
                        (do
                          (log/info "Host removed")
                          (async/go
-                          (async/>! sync-ch :update)))
+                           (async/>! sync-ch :update)))
                        PathChildrenCacheEvent$Type/CHILD_UPDATED
                        (do
                          (log/info "Host updated")
                          (async/go
-                          (async/>! sync-ch :update)))
+                           (async/>! sync-ch :update)))
                        PathChildrenCacheEvent$Type/CONNECTION_LOST
                        (log/error "Lost connection to zk whitelist")
                        PathChildrenCacheEvent$Type/CONNECTION_RECONNECTED
                        (do
                          (log/info "Reconnected to zk whitelist")
                          (async/go
-                          (async/>! sync-ch :update)))
+                           (async/>! sync-ch :update)))
                        PathChildrenCacheEvent$Type/CONNECTION_SUSPENDED
                        (log/error "Connection suspended")
                        PathChildrenCacheEvent$Type/INITIALIZED
                        (do
                          (log/info "Initalized watching of whitelist")
                          (async/go
-                          (async/>! sync-ch :update)))
+                           (async/>! sync-ch :update)))
                        (log/error "Impossible event"))
                      nil))]
     (.. cache
@@ -156,8 +156,8 @@
                                     ;; anywhere
                                     (async/alt!
                                       sync-ch ([_]
-                                                 (sync-fn cache)
-                                                 :synced)
+                                               (sync-fn cache)
+                                               :synced)
                                       :default   :did-not-sync
                                       :priority  true)))
                                 {:error-handler (fn [ex] (log/error ex))})]
@@ -236,11 +236,11 @@
         (log/info "Turning" host named-state "->" (name flag))
         (update-host flag curator zk-whitelist-path host)
         (riemann.core/stream! @riemann.config/core
-                        {:metric (if (= flag :on) 1 -1)
-                         :service "satellite host count"
-                         :host host
-                         :time (.toSeconds TimeUnit/MILLISECONDS
-                                           (System/currentTimeMillis))})))))
+                              {:metric (if (= flag :on) 1 -1)
+                               :service "satellite host count"
+                               :host host
+                               :time (.toSeconds TimeUnit/MILLISECONDS
+                                                 (System/currentTimeMillis))})))))
 
 (defn on-host
   "Turn on host. WARNING: Only proceeds when cache says node is not already on."
@@ -311,9 +311,9 @@
       :on, :off, or nil; nil when host is not in cluster inventory"
   [cache host]
   (cond
-   (not ((get-all-hosts cache) host)) nil
-   ((get-on-hosts cache) host) :on
-   :else :off))
+    (not ((get-all-hosts cache) host)) nil
+    ((get-on-hosts cache) host) :on
+    :else :off))
 
 (defn write-to-zk!
   [curator path bytes]
@@ -369,8 +369,8 @@
   [curator zk-whitelist-path whitelist-cache managed-cache manual-cache]
   (loop [[manual-cd  & manual-cds
           :as manual-cdss]  (.getCurrentData manual-cache)
-          [managed-cd & managed-cds
-           :as managed-cdss] (.getCurrentData managed-cache)]
+         [managed-cd & managed-cds
+          :as managed-cdss] (.getCurrentData managed-cache)]
     (cond
       (and (nil? manual-cd)
            (nil? managed-cd))

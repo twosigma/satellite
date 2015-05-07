@@ -19,6 +19,6 @@
    :handle-malformed (fn [ctx]
                        (::error ctx))
    :handle-not-found (fn [ctx]
-                     (::error ctx))
+                       (::error ctx))
    :handle-ok (fn [ctx]
                 (::res ctx))))

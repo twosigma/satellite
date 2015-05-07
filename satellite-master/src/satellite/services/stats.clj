@@ -13,14 +13,14 @@
    (swap! state
           (fn [state]
             (assoc state
-              :num-hosts-up new-num-up
-              :prop-available-hosts
-              (if (zero? (:num-available-hosts state))
-                (do
-                  (log/warn "No available hosts")
-                  0)
-                (/ new-num-up
-                   (:num-available-hosts state))))))))
+                   :num-hosts-up new-num-up
+                   :prop-available-hosts
+                   (if (zero? (:num-available-hosts state))
+                     (do
+                       (log/warn "No available hosts")
+                       0)
+                     (/ new-num-up
+                        (:num-available-hosts state))))))))
 
 (add-watch
  num-available-hosts :prop-up
@@ -28,14 +28,14 @@
    (swap! state
           (fn [state]
             (assoc state
-              :num-available-hosts new-total
-              :prop-available-hosts
-              (if (zero? new-total)
-                (do
-                  (log/warn "No available hosts")
-                  0)
-                (/ (:num-hosts-up state)
-                   new-total)))))))
+                   :num-available-hosts new-total
+                   :prop-available-hosts
+                   (if (zero? new-total)
+                     (do
+                       (log/warn "No available hosts")
+                       0)
+                     (/ (:num-hosts-up state)
+                        new-total)))))))
 
 (defn stats
   []

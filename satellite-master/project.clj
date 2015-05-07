@@ -29,6 +29,7 @@
                   :exclusions [log4j]]
                  [prismatic/plumbing "0.3.3"]
                  [riemann "0.2.8"]]
+  :plugins [[lein-cljfmt "0.1.10"]]
   :aot [satellite.core]
   :main satellite.core
   :aliases {"release-jar" ["do" "clean," "uberjar"]})

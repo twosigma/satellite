@@ -56,7 +56,7 @@
   gets its own copy of the predicate."
   [trigger? hold?]
   (let [trigger? (if (number? trigger?) #(> (:metric %) trigger?) trigger?)
-        hold?    (if (number? hold?   ) #(> (:metric %) hold?   ) hold?)
+        hold?    (if (number? hold?) #(> (:metric %) hold?) hold?)
         hyst? (fn [acc-hyst event]
                 (or (trigger? event) (and (hold? event) acc-hyst)))
         acc-hyst (atom false)]
@@ -114,9 +114,9 @@
 
 (defn mark-critical-forward-and-turn-off-host
   ([client]
-     (mark-critical-forward-and-turn-off-host "Critical event:"))
+   (mark-critical-forward-and-turn-off-host "Critical event:"))
   ([client msg]
-     (with :state "critical"
-           client
-           #(warn (str msg ": " %))
-           #(off-host (:host %)))))
+   (with :state "critical"
+         client
+         #(warn (str msg ": " %))
+         #(off-host (:host %)))))

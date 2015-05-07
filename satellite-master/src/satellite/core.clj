@@ -201,5 +201,4 @@
   (require 'riemann.transport)
   (require 'riemann.config)
 
-  (satellite.riemann/reload!)
-  )
+  (satellite.riemann/reload!))

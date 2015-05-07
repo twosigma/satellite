@@ -9,9 +9,9 @@
             [satellite.whitelist :as whitelist]))
 
 (defrecord CacheMergeService
-    [curator zk-whitelist-path whitelist-syncer managed-syncer manual-syncer
-     sync-period
-     core merger]
+           [curator zk-whitelist-path whitelist-syncer managed-syncer manual-syncer
+            sync-period
+            core merger]
   ServiceEquiv
   (equiv? [this other]
     (and (instance? CacheMergeService other)

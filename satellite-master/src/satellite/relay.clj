@@ -19,10 +19,10 @@
   (let [helper
         (fn [x [k & ks :as kks]]
           (cond
-           (nil? k) x
-           (map? x) (if (seq ks)
-                      (get-in-state (get x k) ks)
-                      (get x k))
-           (sequential? x) (map #(get-in-state % kks) x)
-           :else (throw (state-exception x))))]
+            (nil? k) x
+            (map? x) (if (seq ks)
+                       (get-in-state (get x k) ks)
+                       (get x k))
+            (sequential? x) (map #(get-in-state % kks) x)
+            :else (throw (state-exception x))))]
     (flatten (helper x kks))))

@@ -6,8 +6,8 @@
             [satellite.whitelist :as whitelist]))
 
 (defrecord WhitelistSyncService
-    [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path
-     leader? core syncer]
+           [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path
+            leader? core syncer]
   ServiceEquiv
   (equiv? [this other]
     (and (instance? WhitelistSyncService other)

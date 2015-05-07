@@ -6,7 +6,7 @@
             [satellite.services :as services]))
 
 (defrecord HTTPService
-    [handler-opts host port core server]
+           [handler-opts host port core server]
   ServiceEquiv
   (equiv? [this other]
     (and (instance? HTTPService other)
@@ -27,17 +27,17 @@
         (let [{:keys [curator riak riak-conn syncer manual-syncer
                       whitelist-hostname-pred
                       zk-whitelist-path]} handler-opts
-                      curator @curator
-                      whitelist-cache (:cache @syncer)
-                      manual-cache (:cache @manual-syncer)
-                      handler (services/service
-                               {:bucket (:bucket riak)
-                                :whitelist-cache whitelist-cache
-                                :manual-cache manual-cache
-                                :curator curator
-                                :zk-whitelist-path zk-whitelist-path
-                                :riak-conn riak-conn
-                                :whitelist-hostname-pred whitelist-hostname-pred})]
+              curator @curator
+              whitelist-cache (:cache @syncer)
+              manual-cache (:cache @manual-syncer)
+              handler (services/service
+                       {:bucket (:bucket riak)
+                        :whitelist-cache whitelist-cache
+                        :manual-cache manual-cache
+                        :curator curator
+                        :zk-whitelist-path zk-whitelist-path
+                        :riak-conn riak-conn
+                        :whitelist-hostname-pred whitelist-hostname-pred})]
           (future
             (try
               (reset! server

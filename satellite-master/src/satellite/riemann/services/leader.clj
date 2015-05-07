@@ -6,7 +6,7 @@
             [satellite.time :as time]))
 
 (defrecord LeaderService
-    [mesos-master-url core leader leader? watcher close]
+           [mesos-master-url core leader leader? watcher close]
   ServiceEquiv
   (equiv? [this other]
     (and (instance? LeaderService other)
@@ -64,6 +64,6 @@
                             (when @leader
                               (stream! core event)))
                           (assoc (meta stream!)
-                            :stream!! stream!)))))
+                                 :stream!! stream!)))))
     (LeaderService. mesos-master-url (atom nil) leader
                     (promise) (atom nil) (atom nil))))

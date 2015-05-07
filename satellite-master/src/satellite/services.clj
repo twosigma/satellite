@@ -11,26 +11,26 @@
   (-> (compojure.core/routes
        ;; task metadata endpoint; requires riak
        (ANY "/state.json" []
-            (state/tasks-metadata riak-conn bucket))
+         (state/tasks-metadata riak-conn bucket))
        (ANY "/stats.json" []
-            (stats/stats))
+         (stats/stats))
        (ANY "/whitelist/host/:host" [host]
-            (whitelist/whitelist-host-st-rm-service
-             whitelist-cache
-             curator
-             zk-whitelist-path
-             host))
+         (whitelist/whitelist-host-st-rm-service
+          whitelist-cache
+          curator
+          zk-whitelist-path
+          host))
        (ANY "/whitelist/host/:host/:flag" [host flag]
-            (whitelist/whitelist-host-flag-service
-             manual-cache
-             curator
-             zk-whitelist-path
-             whitelist-hostname-pred
-             host
-             flag))
+         (whitelist/whitelist-host-flag-service
+          manual-cache
+          curator
+          zk-whitelist-path
+          whitelist-hostname-pred
+          host
+          flag))
        (ANY "/whitelist/:flag" [flag]
-            (whitelist/whitelist-list-service
-             whitelist-cache
-             flag))
+         (whitelist/whitelist-list-service
+          whitelist-cache
+          flag))
        (ANY "*" req
-            (ring.util.response/not-found "Not a supported endpoint.")))))
+         (ring.util.response/not-found "Not a supported endpoint.")))))

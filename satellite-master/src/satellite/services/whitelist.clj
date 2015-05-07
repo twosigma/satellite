@@ -15,10 +15,10 @@
                           (let [addr (java.net.InetAddress/getByName host)
                                 thirty-seconds (-> 30 time/seconds)]
                             (cond
-                             (not (.isReachable addr thirty-seconds))
-                             [true {::error "Host is unreachable."}]
-                             (not (whitelist-hostname-pred host))
-                             [true {::error "Hostname did not pass user supplied predicate."}]))
+                              (not (.isReachable addr thirty-seconds))
+                              [true {::error "Host is unreachable."}]
+                              (not (whitelist-hostname-pred host))
+                              [true {::error "Hostname did not pass user supplied predicate."}]))
                           (catch java.net.UnknownHostException ex
                             [true {::error "Host is not DNS resolvable or an IPv4/6 address."}]))
                    "off" false
@@ -45,11 +45,11 @@
    :exists? (fn [ctx]
               (when-let [flag (whitelist/get-host whitelist-cache host)]
                 (cond
-                 (not (= :get (get-in ctx [:request :request-method]))) true
-                 (= flag :on) [true {::msg "On\n"}]
-                 (= flag :off) [false {::msg "Off\n"}]
-                 :else (throw (Exception.
-                               (str "Get request retrieved status " flag))))))
+                  (not (= :get (get-in ctx [:request :request-method]))) true
+                  (= flag :on) [true {::msg "On\n"}]
+                  (= flag :off) [false {::msg "Off\n"}]
+                  :else (throw (Exception.
+                                (str "Get request retrieved status " flag))))))
    :delete! (fn [ctx]
               (whitelist/rm-host curator zk-whitelist-path host)
               {::msg (str host " was removed from the whitelist.\n")})

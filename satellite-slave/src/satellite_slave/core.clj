@@ -90,24 +90,24 @@
                      (:satellites settings))
         env (cond
                 ;; safe-env not set or is false
-                (not (:safe-env settings)) (System/getenv)
+              (not (:safe-env settings)) (System/getenv)
                 ;; safe-env is a hash-map
-                (map? (:safe-env settings)) (:safe-env settings)
+              (map? (:safe-env settings)) (:safe-env settings)
                 ;; safe-env is set but not a hash-map, default
-                :else (merge
-                 (select-keys (System/getenv)
-                              ["JAVA" "http_proxy" "https_proxy"
-                               "no_proxy"])
-                 {"PATH" "/bin/:/usr/bin/:/sbin/:/usr/sbin/"}))]
+              :else (merge
+                     (select-keys (System/getenv)
+                                  ["JAVA" "http_proxy" "https_proxy"
+                                   "no_proxy"])
+                     {"PATH" "/bin/:/usr/bin/:/sbin/:/usr/sbin/"}))]
     (doseq [test (:comets settings)]
       (chime-at (:schedule test)
                 (fn [_]
                   (try
                     (let [riemann-event (try
                                           (run-test (dissoc test :schedule))
-                                        (catch java.util.concurrent.TimeoutException ex
-                                          {:state "critical"
-                                           :description "timed out"}))
+                                          (catch java.util.concurrent.TimeoutException ex
+                                            {:state "critical"
+                                             :description "timed out"}))
                           riemann-event (assoc riemann-event
                                                :time (.toSeconds TimeUnit/MILLISECONDS
                                                                  (System/currentTimeMillis))

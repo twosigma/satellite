@@ -6,7 +6,7 @@
            (org.apache.curator.retry.BoundedExponentialBackoffRetry)))
 
 (defrecord CuratorService
-    [zookeeper curator-retry-policy curator core]
+           [zookeeper curator-retry-policy curator core]
   ServiceEquiv
   (equiv? [this other]
     (and (instance? CuratorService other)
