@@ -1,5 +1,6 @@
 ;; quick helper time functions, unit of time is milliseconds
-(ns satellite.time)
+(ns satellite.time
+  (import java.util.concurrent.TimeUnit))
 
 (defn millis
   [ms]
@@ -16,3 +17,8 @@
 (defn hours
   [hrs]
   (* hrs (minutes 60)))
+
+(defn unix-now
+  []
+  (.toSeconds TimeUnit/MILLISECONDS
+              (System/currentTimeMillis)))

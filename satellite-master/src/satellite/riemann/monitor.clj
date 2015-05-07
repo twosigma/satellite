@@ -5,7 +5,8 @@
             [riemann.core]
             [satellite.util :as util]
             [satellite.relay :as relay]
-            [satellite.services.stats]))
+            [satellite.services.stats]
+            [satellite.time :as time]))
 
 (in-ns 'riemann.config)
 
@@ -110,6 +111,7 @@
     {:host (:host mesos-master-url)
      :service (str "mesos/leader")
      :state state
+     :time (time/unix-now)
      :ttl 60
      :metric num-leaders}))
 
@@ -125,6 +127,7 @@
        {:host (:host mesos-master-url)
         :ttl 300
         :state "ok"
+        :time (time/unix-now)
         :service (str "mesos/" service)
         :metric (if-let [transform (get transforms "transforms")]
                   (transform (double metric))
@@ -139,15 +142,18 @@
            [{:host hostname
              :state "ok"
              :ttl 300
+             :time (time/unix-now)
              :service (str "mesos/frameworks/" svc-name "/mem")
              :metric (/ (float (get resources "mem")) 1000.0)}
             {:host hostname
              :state "ok"
+             :time (time/unix-now)
              :ttl 300
              :service (str "mesos/frameworks/" svc-name "/cpu")
              :metric (get resources "cpus")}
             {:host hostname
              :state "ok"
+             :time (time/unix-now)
              :ttl 300
              :service (str "mesos/frameworks/" svc-name "/disk")
              :metric (get resources "disk")}])
@@ -169,6 +175,7 @@
                       {:host (sid->host (get task "slave_id"))
                        :sid (get task "slave_id")
                        :state (get task "state")
+                       :time (time/unix-now)
                        :ttl 300
                        :service "mesos/tasks"})]
     (map task->event tasks)))
@@ -179,7 +186,8 @@
                     {:host hostname
                      :service (str "mesos/" (name k))
                      :metric v
-                     :ttl 300})]
+                     :ttl 300
+                     :time (time/unix-now)})]
     (map kv->event @atm)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

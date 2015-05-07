@@ -16,8 +16,7 @@
           org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent$Type
           org.apache.curator.framework.recipes.cache.PathChildrenCacheListener
           org.apache.zookeeper.KeeperException
-          org.apache.zookeeper.KeeperException$Code
-          java.util.concurrent.TimeUnit))
+          org.apache.zookeeper.KeeperException$Code))
 
 ;; todo, move to Curator 2.7.0, use TreeCache, use CAS of hosts
 ;; this would allow scale for 10000x more hosts
@@ -239,8 +238,7 @@
                               {:metric (if (= flag :on) 1 -1)
                                :service "satellite host count"
                                :host host
-                               :time (.toSeconds TimeUnit/MILLISECONDS
-                                                 (System/currentTimeMillis))})))))
+                               :time (time/unix-now)})))))
 
 (defn on-host
   "Turn on host. WARNING: Only proceeds when cache says node is not already on."
