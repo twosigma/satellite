@@ -84,7 +84,7 @@
            (keys event))))
 
 (defn app
-  [settings finish-chan]
+  [settings dry-run finish-chan]
   (let [clients (map (fn [satellite]
                        (tcp-client satellite))
                      (:satellites settings))
@@ -107,7 +107,10 @@
                                           (run-test (dissoc test :schedule))
                                           (catch java.util.concurrent.TimeoutException ex
                                             {:state "critical"
-                                             :description "timed out"}))
+                                             :description "timed out"})
+                                          (catch Exception ex
+                                            {:state "critical"
+                                             :description (str "command: " (:command test) ex)}))
                           riemann-event (assoc riemann-event
                                                :time (.toSeconds TimeUnit/MILLISECONDS
                                                                  (System/currentTimeMillis))
@@ -115,7 +118,9 @@
                                                              (:service riemann-event)))]
                       (doseq [client clients]
                         (try
-                          (send-event client riemann-event)
+                          (if dry-run
+                            (println riemann-event)
+                            (send-event client riemann-event))
                           (log/debug (format "Sent event: %s" riemann-event))
                           (catch Exception ex
                             (log/error (str "service: " (:service riemann-event) " "
@@ -143,5 +148,6 @@
     (do (log/info (str "Reading config from file: " config))
         (config/include config))
     (log/info (str "Using default settings.")))
-  (let [finish-chan (async/chan 1)]
-    (app config/settings finish-chan)))
+  (let [finish-chan (async/chan 1)
+        dry-run (when args (.contains args "--dry-run"))]
+    (app config/settings dry-run finish-chan)))
