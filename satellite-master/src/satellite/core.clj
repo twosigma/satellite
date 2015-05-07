@@ -6,6 +6,7 @@
             [clojure.tools.logging :as log]
             [liberator.core :refer (resource)]
             [plumbing.core :refer (fnk)]
+            [plumbing.core]
             [plumbing.graph :as graph]
             [satellite.recipes]
             [satellite.riemann :as riemann]
@@ -17,8 +18,36 @@
             [satellite.riemann.services.whitelist]
             [satellite.time :as time]
             [satellite.util :as util]
-            [satellite.whitelist :as whitelist])
+            [satellite.whitelist :as whitelist]
+            [schema.core :as s])
   (:gen-class))
+
+(defn file-exists?
+  [f]
+  (.exists (clojure.java.io/as-file f)))
+
+(def riemann-tcp-server-schema
+  {(s/optional-key :host) s/Str
+   (s/optional-key :port) s/Int})
+
+(def settings-schema
+  {;; the Riemann config file that will process events
+   :riemann-config (s/pred file-exists? 'file-exists?)
+   :riemann-tcp-server-options riemann-tcp-server-schema
+   :sleep-time s/Int
+   :mesos-master-url cemerick.url.URL
+   :riak (s/maybe {:endpoint (s/pred clojure.java.io/as-url)
+                   :bucket s/Str})
+   :service-host s/Str
+   :service-port s/Int
+   :zookeeper s/Str
+   :curator-retry-policy {:base-sleep-time-ms s/Int
+                          :max-sleep-time-ms s/Int
+                          :max-retries s/Int}
+   :local-whitelist-path s/Str
+   :local-manual-whitelist-path s/Str
+   :local-managed-whitelist-path s/Str
+   :whitelist-hostname-pred (s/pred clojure.test/function? 'clojure.test/function)})
 
 (def settings
   ;; Settings for the Satellite monitor/service
@@ -26,39 +55,41 @@
   ;; Current values are used as the defaults; to override them, assoc values
   ;; into this var
   {;; the Riemann config file that will process events
-   :riemann-config (fnk [] "config/riemann-config.clj")
-   ;;
-   :riemann-tcp-server-options (fnk [] {})
+   :riemann-config "config/riemann-config.clj"
+   ;; if you do not explicitly bind you will just get localhost
+   :riemann-tcp-server-options {}
    ;; the sleep time between loops of polling Mesos Master endpoints to create
    ;; the event stream
-   :sleep-time (fnk [] 60000)
+   :sleep-time 60000
    ;; a cemerick.url.URL record type
-   :mesos-master-url (fnk [] (url/url "http://localhost:5050"))
+   :mesos-master-url (url/url "http://localhost:5050")
    ;; Riak endpoint serving cached task metadata, nil if not using
-   :riak (fnk []
-              {:endpoint "http://uri/to/riak"
-               :bucket "bucket-name"})
+   ;;    {:endpoint "http://uri/to/riak"
+   ;;     :bucket "bucket-name"}
+   :riak nil
    ;; service
-   :service-host (fnk [] nil)
+   :service-host nil
    ;; Port on which the service is publicly accessible
-   :service-port (fnk [] 5001)
+   :service-port 5001
    ;; Zookeeper string used for whitelist co-ordination
-   :zookeeper (fnk [] "zk1:port,zk2:port,zk3:port")
+   :zookeeper "zk1:port,zk2:port,zk3:port"
    ;; Curator retry policy
-   :curator-retry-policy (fnk []
-                              {:base-sleep-time-ms 100
-                               :max-sleep-time-ms 120000
-                               :max-retries 10})
+   :curator-retry-policy {:base-sleep-time-ms 100
+                          :max-sleep-time-ms 120000
+                          :max-retries 10}
    ;; the path on disk to the Mesos whitelist
-   :local-whitelist-path (fnk [] "whitelist")
+   :local-whitelist-path "whitelist"
    ;; the path on disk to put the manual Mesos whitelist
-   :local-manual-whitelist-path (fnk [] "manual-whitelist")
+   :local-manual-whitelist-path "manual-whitelist"
    ;; the path on disk to put hte managed Mesos whitelist
-   :local-managed-whitelist-path (fnk [] "managed-whitelist")
+   :local-managed-whitelist-path "managed-whitelist"
    ;; predicate used to validate hosts that are added to the whitelist
-   :whitelist-hostname-pred (fnk []
-                                 (fn [hostname]
-                                   (identity hostname)))})
+   :whitelist-hostname-pred (fn [hostname]
+                              (identity hostname))})
+
+(defn map->graph
+  [m]
+  (plumbing.core/map-vals (fn [x] (fnk [] x)) m))
 
 (defn app
   [settings]
@@ -189,7 +220,8 @@
     (do (log/info (str "Reading config from file: " config))
         (load-file config))
     (log/info (str "Using default settings" settings)))
-  ((graph/eager-compile (app settings)) {}))
+  (s/validate settings-schema settings)
+  ((graph/eager-compile (app (map->graph settings))) {}))
 
 (comment
   (init-logging)

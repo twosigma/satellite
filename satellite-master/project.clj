@@ -28,6 +28,10 @@
                  [org.slf4j/slf4j-log4j12 "1.7.7"
                   :exclusions [log4j]]
                  [prismatic/plumbing "0.3.3"]
+                 ;; do not bump past schema 0.3.3 -- broken for :aot
+                 ;; check https://github.com/Prismatic/plumbing/issues/74
+                 ;; for progress
+                 [prismatic/schema "0.3.3"]
                  [riemann "0.2.8"]]
   :plugins [[lein-cljfmt "0.1.10"]]
   :aot [satellite.core]
