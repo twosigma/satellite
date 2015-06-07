@@ -56,7 +56,7 @@
       test: test-map
 
   Output:
-      map: With optional keys, :out :exit :err"
+      riemann-events: list"
   [t]
   (let [cmd (if (instance? String (:command t))
               (clojure.string/split (:command t) #"\s+")
@@ -103,20 +103,23 @@
       (chime-at (:schedule test)
                 (fn [_]
                   (try
-                    (let [riemann-event (try
-                                          (run-test (dissoc test :schedule))
+                    (let [riemann-events (try
+                                           (run-test (dissoc test :schedule))
                                           (catch java.util.concurrent.TimeoutException ex
-                                            {:state "critical"
-                                             :description "timed out"})
+                                            [{:state "critical"
+                                              :description "timed out"}])
                                           (catch Exception ex
-                                            {:state "critical"
-                                             :description (str "command: " (:command test) ex)}))
-                          riemann-event (assoc riemann-event
-                                               :time (.toSeconds TimeUnit/MILLISECONDS
-                                                                 (System/currentTimeMillis))
-                                               :service (str (:service settings)
-                                                             (:service riemann-event)))]
-                      (doseq [client clients]
+                                            [{:state "critical"
+                                              :description (str "command: " (:command test) ex)}]))
+                          add-time-and-svc (fn [riemann-event]
+                                             (assoc riemann-event
+                                                    :time (.toSeconds TimeUnit/MILLISECONDS
+                                                                      (System/currentTimeMillis))
+                                                    :service (str (:service settings)
+                                                                  (:service riemann-event))))
+                          riemann-events (map add-time-and-svc riemann-events)]
+                      (doseq [client clients
+                              riemann-event riemann-events]
                         (try
                           (if dry-run
                             (println riemann-event)

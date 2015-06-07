@@ -41,7 +41,7 @@
                                   (log/error e "Failed to cache state.")
                                   ;; Return a value strictly larger that the threshold.
                                   (inc threshold)))]
-                 {:ttl (* 5 (.getSeconds period))
-                  :service "cache state"
-                  :state (if (> failures threshold) "critical" "ok")
-                  :metric failures}))}))
+                 [{:ttl (* 5 (.getSeconds period))
+                   :service "cache state"
+                   :state (if (> failures threshold) "critical" "ok")
+                   :metric failures}]))}))

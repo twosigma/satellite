@@ -24,10 +24,10 @@
    :schedule (every period)
    :output (fn [{:keys [out err exit]}]
              (let [v (Integer/parseInt (clojure.string/trim out))]
-               {:ttl (* 5 (.getSeconds period))
-                :service "free memory in MB"
-                :state (if (> v threshold) "ok" "critical")
-                :metric v}))
+               [{:ttl (* 5 (.getSeconds period))
+                 :service "free memory in MB"
+                 :state (if (> v threshold) "ok" "critical")
+                 :metric v}]))
    :timeout 5})
 
 (defn free-swap
@@ -37,10 +37,10 @@
    :timeout 5
    :output (fn [{:keys [out err exit]}]
              (let [v (Integer/parseInt (clojure.string/trim out))]
-               {:ttl (* 5 (.getSeconds period))
-                :service "free swap in MB"
-                :state (if (> v threshold) "ok" "critical")
-                :metric v}))})
+               [{:ttl (* 5 (.getSeconds period))
+                 :service "free swap in MB"
+                 :state (if (> v threshold) "ok" "critical")
+                 :metric v}]))})
 
 (defn free-swap-iff-swap
   [threshold period]
@@ -52,11 +52,11 @@
                            (Integer/parseInt (clojure.string/trim o)))
                    [configured used free]
                    (map ->int (clojure.string/split out #"\s+"))]
-               {:ttl (* 5 (.getSeconds period))
-                :service "free swap iff swap in MB"
-                :state (if (or (= configured 0) (> free threshold))
-                         "ok" "critical")
-                :metric free}))})
+               [{:ttl (* 5 (.getSeconds period))
+                 :service "free swap iff swap in MB"
+                 :state (if (or (= configured 0) (> free threshold))
+                          "ok" "critical")
+                 :metric free}]))})
 
 (defn percentage-used
   [threshold path period]
@@ -65,10 +65,10 @@
    :timeout 5
    :output (fn [{:keys [out err exit]}]
              (let [v (Integer/parseInt (clojure.string/trim out))]
-               {:ttl (* 5 (.getSeconds period))
-                :service (str "percentage used of " path)
-                :state (if (< v threshold) "ok" "critical")
-                :metric v}))})
+               [{:ttl (* 5 (.getSeconds period))
+                 :service (str "percentage used of " path)
+                 :state (if (< v threshold) "ok" "critical")
+                 :metric v}]))})
 
 (defn df-returns
   [timeout period]
@@ -76,10 +76,10 @@
    :schedule (every period)
    :timeout timeout
    :output (fn [{:keys [out exit err]}]
-             {:ttl (* 5 (.getSeconds period))
-              :service "df returns in timely fashion"
-              :state (if (zero? exit) "ok" "critical")
-              :metric exit})})
+             [{:ttl (* 5 (.getSeconds period))
+               :service "df returns in timely fashion"
+               :state (if (zero? exit) "ok" "critical")
+               :metric exit}])})
 
 (defn num-uninterruptable-processes
   [threshold period]
@@ -87,10 +87,10 @@
    :schedule (every period)
    :output (fn [{:keys [out err exit]}]
              (let [v (Integer/parseInt (clojure.string/trim out))]
-               {:ttl (* 5 (.getSeconds period))
-                :service "number of processes in uninterruptable sleep"
-                :state (if (< v threshold) "ok" "critical")
-                :metric v}))})
+               [{:ttl (* 5 (.getSeconds period))
+                 :service "number of processes in uninterruptable sleep"
+                 :state (if (< v threshold) "ok" "critical")
+                 :metric v}]))})
 
 (defn load-average
   [threshold period]
@@ -98,10 +98,10 @@
    :schedule (every period)
    :output (fn [{:keys [out err exit]}]
              (let [v (Float/parseFloat (clojure.string/trim out))]
-               {:ttl (* 5 (.getSeconds period))
-                :service "load average over past 15 minutes"
-                :state (if (< v threshold) "ok" "critical")
-                :metric v}))})
+               [{:ttl (* 5 (.getSeconds period))
+                 :service "load average over past 15 minutes"
+                 :state (if (< v threshold) "ok" "critical")
+                 :metric v}]))})
 
 (defn file-exists
   [path period]
@@ -109,7 +109,7 @@
   {:command ["satellite-recipes" "file-exists" path]
    :schedule (every period)
    :output (fn [{:keys [out err exit]}]
-             {:state (if (zero? exit) "ok" "critical")
-              :metric exit
-              :ttl (* 5 (.getSeconds period))
-              :service (str path "exists")})})
+             [{:state (if (zero? exit) "ok" "critical")
+               :metric exit
+               :ttl (* 5 (.getSeconds period))
+               :service (str path "exists")}])})
