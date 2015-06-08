@@ -4,7 +4,8 @@ An agent to monitor your Mesos Slaves.
 
 ## Requirements
 
-Java (tested against Oracle JDK 1.7), Mesos, Zookeeper.
+Java (tested against Oracle JDK 1.7), Mesos, Zookeeper,
+[Leiningen](http://leiningen.org/)
 
 ## Installation
 

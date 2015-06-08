@@ -1,6 +1,6 @@
 # Satellite
 
-Satellite monitors, alerts on, and self-heals your Mesos cluster. 
+Satellite monitors, alerts on, and self-heals your Mesos cluster.
 
 ## Overview
 
@@ -8,7 +8,7 @@ Satellite currently serves three functions, each adding functionality to Mesos:
 
 1.  Most importantly, Satellite Master directly monitors Mesos masters and
     receives monitoring information from Mesos slaves through Satellite
-    Slaves, producing a Riemann (http://riemann.io/index.html) event stream for
+    Slaves, producing a [Riemann](http://riemann.io/index.html) event stream for
     aggregate statistics of the cluster (e.g., utilization, number of tasks
     lost) as well as events specific to the masters (e.g., how many leaders are
     there).
@@ -49,9 +49,10 @@ observes.
 
 ## Architecture
 ### High level
-There are two kinds of Satellite processes: `satellite-master`s and `satellite-slave`s.
-For each `mesos-master` and `mesos-slave` process, there is a `satellite-master` and `satellite-slave`
-process watching it respectively.
+There are two kinds of Satellite processes: `satellite-master`s and
+`satellite-slave`s.
+For each `mesos-master` and `mesos-slave` process, there is a `satellite-master`
+and `satellite-slave` process watching it respectively.
 <pre>
 
 | Follower         | Leader           | Follower         |
@@ -68,5 +69,20 @@ process watching it respectively.
 </pre>
 ### Little lower
 `satellite-master` embeds Riemann and `satellite-slave` embeds a Riemann client.
-`satellite-slave`s send one type of message to all the `satellite-masters`, a Riemann event that is the
-result of a user-specified test.
+`satellite-slave`s send one type of message to all the `satellite-masters`, a
+Riemann event that is the result of a user-specified test.
+
+You can use Riemann's powerful stream processing DSL to act on the events
+your slave is sending the masters--email, alert, turn hosts on or off--it's up
+to you!
+
+We've provided some very, very basic recipes and are interested in adding more,
+so please send a pull request if you think anything would serve the larger
+community.
+
+## Contributing
+We need all contributors to fill out our Contributor License Agreement before
+we can accept any code or pull requests.
+
+## &c
+Apache Mesos is a trademark of the Apache Software Foundation.

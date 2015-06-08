@@ -2,7 +2,8 @@
 
 ## Requirements
 
-Java (tested against Oracle JDK 1.7), Mesos, Zookeeper.
+Java (tested against Oracle JDK 1.7), Mesos, Zookeeper,
+[Leiningen](http://leiningen.org/)
 
 If you are using the cached metadata feature, Riak 1.4+ is also necessary.
 
