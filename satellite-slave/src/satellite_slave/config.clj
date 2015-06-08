@@ -20,54 +20,58 @@
             [satellite-slave.util :refer [every]]))
 
 (def settings
-  {:satellites [{:host "localhost"}]
-   ;; a comet has the following schema:
+  {;; :satellite : [riemann-tcp-client]; configure one client per
+   ;;              satellite-master. See
+   ;;              https://github.com/aphyr/riemann-clojure-client/blob/0.3.1/src/riemann/client.clj#L121
+   ;;              for parameters
+   :satellites [{:host "localhost"}]
+   ;; :service : String, to prefix the :service key in all Riemann events
+   :service "/my/yellow/pig/service"
+   ;; :comets : [comet], where a comet has the following schema:
    ;;
-   ;; comet : {:riemann Riemann-map :test Test-map}
+   ;; comet : {:command     String | [String]
+   ;;          :schedule    [joda times]
+   ;;          :timeout     Integer
+   ;;          :output      output-fn}
    ;;
-   ;; where Riemann-map is a typical Riemann map with the following default
-   ;; values:
-   ;;     host: will be resolved by hostname(1)
-   ;;     time: will be approximately time command was run.
+   ;; :command  : a shell command to run; e.g., "ls -l" or ["ls" "-l"]
+   ;; :schedule : when to call your test
+   ;; :timeout  : how many seconds to wait for shell command to complete
+   ;;             before returning :timeout "critical" state
+   ;; :output   : a function that takes a map with three arguments--
+   ;;             out, err, exit--and returns a list of Riemann event maps
+   ;;             with the following default values:
    ;;
-   ;; and Test-map has the following schema
+   ;;               host: will be resolved by hostname(1)
+   ;;               time: will be approximately time command was run.
    ;;
-   ;; Test-map : {:command String | list of Strings, required, a shell command
-   ;;                      to run, e.g., "ls -l" or ["ls" "-l"]
-   ;;             :schedule required, sequence of joda times, when to call your
-   ;;                       test
-   ;;             :output  Output-map, optional, expectations of the output
-   ;;             :timeout long, optional, timeout for shell command in seconds
-   ;;             :eventify, fn, optional, if you want override post-processing}.
-   ;;
-   ;; The Output-map schema is
-   ;;
-   ;; Output-map : {:out Output-val, optional
-   ;;               :exit Output-val, optional
-   ;;               :err Output-val, optional}.
-   ;;
-   ;; The Output-val schema is
-   ;;
-   ;; Output-val : (fn x -> Any) | x
-   ;;
-   ;; which is to say, either a unary function or a value. If it is function, it
-   ;; is applied to the command output for the corresponding key. If it is a
-   ;; value, the command output is tested for equality against it.
+   ;;             Each of these event maps will be sent to each
+   ;;             satellite-master specified in :satellites.
    :comets [{:command "echo Hello"
-             :output {:out "Hello\n"}
-             :timeout 30
              :schedule (every (-> 3 t/seconds))
-             :host "dope.host"
-             :ttl 60}
+             :timeout 30
+             :output (fn [{:keys [out exit err]}]
+                       [{:ttl 30
+                         :service "Hello service"
+                         :state "ok"}])}
             {:command ["ls" "-l"]
              :schedule (every (-> 10 t/seconds))
-             :ttl 40
-             :tags ["pink" "pig"]}
+             :timeout 5
+             :output (fn [{:keys [out exit err]}]
+                       [{:ttl 30
+                         :service "ls -l"
+                         :state (if (zero? exit) "ok" "critical")}])}
             {:command ["ls" "-l"]
-             :output {:exit (fn [ret] (+ ret 17))}
              :schedule (every (-> 17 t/seconds))
-             :ttl 20
-             :tags ["yellow" "pig"]}]
+             :output (fn [{:keys [out exit err]}]
+                       [{:ttl 20
+                         :service "yellow pig increment"
+                         :state "ok"
+                         :metric (+ exit 17)
+                         :tags ["yellow" "pig"]}])}]
+   ;; :safe-env : bool | {String String} , whether you want to clear the
+   ;;             environment variables or wish to specify what environment
+   ;;             Satellite should have.
    :safe-env true})
 
 (defn include

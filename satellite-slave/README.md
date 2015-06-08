@@ -20,7 +20,8 @@ your config file. For example,
 java -jar satellite.jar config.clj
 ```
 
-There is a sample config included in `/config`.
+There is a sample config included in `/config/sample.clj` and thorough
+documentation of the config in `/src/satellite_slave/config.clj`.
 
 ## Security
 

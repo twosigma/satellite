@@ -33,7 +33,7 @@
                                    (clojure.string/split #"\s+")
                                    first
                                    (Integer/parseInt))]
-                         {:state "ok"
-                          :metric v
-                          :ttl 300
-                          :description "example test -- number of files/dirs in cwd"}))}]})
+                         [{:state "ok"
+                           :metric v
+                           :ttl 300
+                           :description "example test -- number of files/dirs in cwd"}]))}]})
