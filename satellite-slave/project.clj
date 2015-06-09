@@ -12,7 +12,8 @@
 ;; See the License for the specific language governing permissions and
 ;; limitations under the License.
 
-(defproject satellite-slave "0.1.0-SNAPSHOT"
+(defproject satellite-slave "0.1.0"
+  :description "Monitoring and alerting for Mesos"
   :url "http://github.com/twosigma/satellite/satellite-slave"
   :license {:name "Apache License, Version 2.0"
             :url "http://opensource.org/licenses/apache2.0.php"}
