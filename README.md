@@ -81,8 +81,8 @@ so please send a pull request if you think anything would serve the larger
 community.
 
 ## Contributing
-We need all contributors to fill out our Contributor License Agreement before
-we can accept any code or pull requests.
+We need all contributors to fill out our Contributor License Agreement found in
+`/cla` before we can accept any code or pull requests.
 
 ## &c
 Apache Mesos is a trademark of the Apache Software Foundation.
