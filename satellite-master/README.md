@@ -61,7 +61,7 @@ endpoints modify the manual whitelist.
 
 `flag` can take three values: `on`, `off`, and `all`.
 
-Return the current inventory as a single sorted text file. If `on`, return only
+Return the current state of hosts. If `on`, return only
 hosts in the whitelist; if `off`, return only hosts in inventory, but not in
 the whitelist; and if `all`, return all hosts in the inventory.
 
@@ -70,38 +70,38 @@ Examples:
 Request:
 
 ```bash
-curl example.com/whitelist/on
-```
-
-Response:
-
-```
-my.dope.host
-```
-
-Request:
-
-```
-curl example.com/whitelist/off
-```
-
-Response:
-
-```
-my.broken.host
-```
-
-Request:
-
-```
 curl example.com/whitelist/all
 ```
 
 Response:
 
-```
-my.broken.host
-my.dope.host
+```json
+{
+ host1: {
+     managed-events: {
+         mytest: {
+             host: "host1",
+             service: "mytest",
+             state: "critical",
+             description: "mydescription",
+             mertic: 0,
+             tags: null,
+             time: 1435073979,
+             ttl: 300
+             }
+     },
+     manual-events: {
+        mymanualoverride: {
+            state: "ok"
+            description: "manually override host flag to on"
+            time: 1435073979,
+            ttl: 172800
+        }
+     },
+     managed-flag: "off",
+     manual-flag: "on"
+ }
+}
 ```
 
 ### `GET /whitelist/host/{host}`
@@ -120,13 +120,36 @@ curl example.com/whitelist/host/my.dope.host
 
 Response:
 
-```
-On
+```json
+{
+    managed-events: {
+         mytest: {
+             host: "host1",
+             service: "mytest",
+             state: "critical",
+             description: "mydescription",
+             mertic: 0,
+             tags: null,
+             time: 1435073979,
+             ttl: 300
+             }
+     },
+     manual-events: {
+        mymanualoverride: {
+            state: "ok"
+            description: "manually override host flag to on"
+            time: 1435073979,
+            ttl: 172800
+        }
+     },
+     managed-flag: "off",
+     manual-flag: "on"
+}
 ```
 
 ### `DELETE /whitelist/host/{host}`
 
-Remove `host` from the manual whitelist. Returns `200` on success. Returns `404` if
+Remove `host` from the inventory. Returns `200` on success. Returns `404` if
 `host` was not in the inventory.
 
 Example:
@@ -143,11 +166,10 @@ Response:
 my.dope.host was removed from the whitelist.
 ```
 
-### `PUT /whitelist/host/{host}/{flag}`
+### `POST /whitelist/host/{host}/event/{event}`
 
-Override `host` to `flag`. If `host` is not currently in the manual whitelist,
-`host` will be added. If `flag` is `on`, `host` will be added to the whitelist
-of each Mesos Master after passing validation.
+Override manual 'event' on 'host', If `host` is not currently in the manual whitelist,
+`host` will be added. Manual flag is decided by state of most recent manual event.
 
 For `host` to pass validation it must be
 
@@ -155,16 +177,32 @@ For `host` to pass validation it must be
 * pingable from the Satellite host
 * and pass a user-specified predicate, which by default is always true.
 
+`ttl` is a string describing the time to live of this event, i.e., `15minute`, `24hour`, `7day`, `2week`. Event expires when current time is after event creation time plus `ttl` and will be garbage collected.
+
+`state` is either `ok` or `critical`. `ok` will turn on the host, `critical` will turn off the host
+
 Success will return status code `201` and failure will return status code `400`.
 
+Example:
+
+Request:
+
 ```bash
-curl -X PUT example.com/whitelist/host/my.dope.host/off
+curl -H "Content-Type: application/json" -X POST -d '{"ttl": "7day" "state": "critical" "description": "reconfiguraton"}' example.com:5051/whitelist/host/my.dope.host/event/manual
 ```
 
 Response:
 
+```bash
+my.dope.host updated
 ```
-my.dope.host is now off.
+
+### `DELETE /whitelist/host/{host}/event/{event}`
+
+Delete manual 'event' on 'host'. This will trigger revaluation of manual flag.
+
+```bash
+curl -X DELETE example.com:5051/whitelist/host/my.dope.host/event/manual
 ```
 
 ### `GET /state.json`

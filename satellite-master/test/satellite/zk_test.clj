@@ -53,3 +53,14 @@
        ~@body
        (finally
          (.close ~curator)))))
+
+(defmacro with-resources
+  [bindings & body]
+  (let [[x v & more] bindings]
+    `(let [~x ~v]
+       (try
+         ~(if-let [more (seq more)]
+            `(with-resources ~more ~@body)
+            `(do ~@body))
+         (finally
+           (.close ~x))))))

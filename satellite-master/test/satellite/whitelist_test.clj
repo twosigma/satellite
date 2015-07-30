@@ -16,36 +16,54 @@
   (use satellite.whitelist
        satellite.zk-test
        clojure.test)
+  (require [clojure.core.async :as async])
   (import org.apache.curator.retry.BoundedExponentialBackoffRetry
           org.apache.curator.framework.CuratorFramework
           org.apache.curator.framework.CuratorFrameworkFactory
           org.apache.curator.framework.recipes.cache.PathChildrenCache
           org.apache.curator.test.TestingServer))
 
+(def empty-whitelist-data (new-whitelist-data))
+(def managed-on-whitelist-data (set-flag empty-whitelist-data :managed "on"))
+(def managed-off-whitelist-data (set-flag empty-whitelist-data :managed "off"))
+(def manual-on-whitelist-data (set-flag empty-whitelist-data :manual "on"))
+(def manual-off-whitelist-data (set-flag empty-whitelist-data :manual "off"))
+
+(deftest test-whitelist-data-on?
+  (testing "test-1"
+    (let [whitelist-data empty-whitelist-data]
+      (is (= false (whitelist-data-on? whitelist-data)))))
+  (testing "test-2"
+    (let [whitelist-data (set-flag empty-whitelist-data :managed "on")]
+      (is (= true (whitelist-data-on? whitelist-data)))))
+  (testing "test-3"
+    (let [whitelist-data (set-flag empty-whitelist-data :manual "off")]
+      (is (= false (whitelist-data-on? whitelist-data)))))
+  (testing "test-4"
+    (let [whitelist-data (-> empty-whitelist-data
+                             (set-flag :managed "off")
+                             (set-flag :manual "on"))]
+      (is (= true (whitelist-data-on? whitelist-data)))))
+  (testing "test-5"
+    (let [whitelist-data (-> empty-whitelist-data
+                             (set-flag :managed "on")
+                             (set-flag :manual "off"))]
+      (is (= false (whitelist-data-on? whitelist-data))))))
+
 (deftest test-cache
   (with-zk [zk]
     (with-curator [zk curator]
       (.start curator)
       (.. curator create (forPath "/test" (.getBytes "test")))
-      (let [state (atom 0)
-            yoyo (batch-sync curator "/test" 1000 (fn [_] (swap! state inc)))]
-        (.. curator create (forPath "/test/foo" (.getBytes "foo")))
-        (testing "batch-sync"
-          (Thread/sleep 2000)
-          (is (= 1 @state))
-          (.. curator create (forPath "/test/bar" (.getBytes "bar")))
-          (is (= 1 @state))
-          (Thread/sleep 1100)
-          (is (= 2 @state)))
+
+      (with-resources [cache (start-cache! curator "/test" (async/chan (async/sliding-buffer 1)))]
         (testing "get-hosts"
-          (.. curator create (forPath "/test/host" (.getBytes (str :on))))
-          (Thread/sleep 1000)
-          (is (= #{"host"} (get-on-hosts (:cache yoyo)))))
-        (testing "get-host"
-          (is (= :on (get-host (:cache yoyo) "host")))
-          (is (= nil (get-host (:cache yoyo) "host-not-here"))))
-        ((:sync yoyo))
-        (.close (:cache yoyo))))))
+          (let [whitelist-data (set-flag empty-whitelist-data :managed "on")]
+            (.. curator create (forPath "/test/host" (whitelist-data->bytes whitelist-data)))
+            (Thread/sleep 1000)
+            (is (= #{"host"} (set (keys (get-on-hosts cache)))))
+            (is (= whitelist-data (:whitelist-data (get-host cache "/test" "host"))))
+            (is (= nil (:whitelist-data (get-host cache "/test" "host-not-here"))))))))))
 
 (deftest test-write-out-cache
   (with-zk [zk]
@@ -60,29 +78,29 @@
             (is (= (.toString wtr)
                    ""))))
         (testing "Non-empty dir, singleton :on"
-          (.. curator create (forPath "/test/foo" (.getBytes (str :on))))
+          (.. curator create (forPath "/test/foo" (whitelist-data->bytes managed-on-whitelist-data)))
           (Thread/sleep 500)
           (let [wtr (java.io.StringWriter.)]
             (write-out-cache! wtr cache)
             (is (= (.toString wtr)
                    "foo\n"))))
         (testing "Non-empty dir, multiple :on"
-          (.. curator create (forPath "/test/bar" (.getBytes (str :on))))
+          (.. curator create (forPath "/test/bar" (whitelist-data->bytes managed-on-whitelist-data)))
           (Thread/sleep 500)
           (let [wtr (java.io.StringWriter.)]
             (write-out-cache! wtr cache)
             (is (= (.toString wtr)
                    "bar\nfoo\n"))))
         (testing "Turning a host :off"
-          (.. curator setData (forPath "/test/bar" (.getBytes (str :off))))
-          (.. curator create (forPath "/test/baz" (.getBytes (str :on))))
+          (.. curator setData (forPath "/test/bar" (whitelist-data->bytes managed-off-whitelist-data)))
+          (.. curator create (forPath "/test/baz" (whitelist-data->bytes manual-on-whitelist-data)))
           (Thread/sleep 500)
           (let [wtr (java.io.StringWriter.)]
             (write-out-cache! wtr cache)
             (is (= (.toString wtr)
                    "baz\nfoo\n"))))
         (testing "Turning another host :off"
-          (.. curator setData (forPath "/test/baz" (.getBytes (str :off))))
+          (.. curator setData (forPath "/test/baz" (whitelist-data->bytes manual-off-whitelist-data)))
           (Thread/sleep 500)
           (let [wtr (java.io.StringWriter.)]
             (write-out-cache! wtr cache)
@@ -90,176 +108,85 @@
                    "foo\n"))))
         (.close cache)))))
 
-(deftest initialize-whitelist-test
-  (with-zk [zk]
-    (with-curator [zk curator]
-      (.start curator)
-      (try
-        (initialize-whitelist (java.io.BufferedReader. (java.io.StringReader. "my\nfoo\nhosts\n")) curator "/test")
-        (testing "whole"
-          (is (= (read-string (String. (.. curator getData (forPath "/test/my"))))
-                 :on)))))))
-
 (deftest update-host-test
   (with-zk [zk]
     (with-curator [zk curator]
       (.start curator)
       (.. curator create (forPath "/test" (byte-array 0)))
-      (testing "add host that doesn't exist"
-        (update-host :on curator "/test" "my.dope.host")
-        (is (= (read-string (String. (.. curator getData (forPath "/test/my.dope.host"))))
-               :on)))
-      (testing "change host that does exist, and use a slash dir"
-        (update-host :critical curator "/test/" "my.dope.host")
-        (is (= (read-string (String. (.. curator getData (forPath "/test/my.dope.host"))))
-               :critical))))))
 
-(deftest merge-whitelist-caches!-test
-  (with-zk [zk]
-    (with-curator [zk curator]
-      (.start curator)
-      (doseq [path ["/whitelist" "/manual" "/managed"]]
-        (.. curator create (forPath path (byte-array 0))))
-      (let [[whitelist-state manual-state managed-state]
-            (map (fn [x] (atom 0)) (range 3))
-            whitelist (batch-sync curator "/whitelist" 100
-                                  (fn [_] (swap! whitelist-state inc)))
-            manual (batch-sync curator "/manual" 100
-                               (fn [_] (swap! manual-state inc)))
-            managed (batch-sync curator "/managed" 100
-                                (fn [_] (swap! managed-state inc)))]
-        (testing "basics"
-          (.. curator create (forPath "/manual/foo" (.getBytes (str :on))))
-          (.. curator create (forPath "/manual/baz" (.getBytes (str :on))))
-          (.. curator create (forPath "/managed/bar" (.getBytes (str :on))))
-          (.. curator create (forPath "/managed/baz" (.getBytes (str :off))))
-          (Thread/sleep 1000)
-          (merge-whitelist-caches! curator "/whitelist"
-                                   (:cache whitelist)
-                                   (:cache managed)
-                                   (:cache manual))
-          (Thread/sleep 1000)
-          (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr (:cache whitelist))
-            (is (= (.toString wtr)
-                   "bar\nbaz\nfoo\n")))))))
-  (with-zk [zk]
-    (with-curator [zk curator]
-      (.start curator)
-      (doseq [path ["/whitelist" "/manual" "/managed"]]
-        (.. curator create (forPath path (byte-array 0))))
-      (let [[whitelist-state manual-state managed-state]
-            (map (fn [x] (atom 0)) (range 3))
-            whitelist (batch-sync curator "/whitelist" 100
-                                  (fn [_] (swap! whitelist-state inc)))
-            manual (batch-sync curator "/manual" 100
-                               (fn [_] (swap! manual-state inc)))
-            managed (batch-sync curator "/managed" 100
-                                (fn [_] (swap! managed-state inc)))]
-        (testing "no managed list"
-          (doseq [[path flag] (->> (interleave (repeat :on) (repeat :off))
-                                   (map vector (map char (range 97 107))))]
-            (.. curator create (forPath (str "/manual/" path) (.getBytes (str flag)))))
-          (Thread/sleep 1000)
-          (merge-whitelist-caches! curator "/whitelist"
-                                   (:cache whitelist)
-                                   (:cache managed)
-                                   (:cache manual))
-          (Thread/sleep 1000)
-          (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr (:cache whitelist))
-            (is (= (.toString wtr)
-                   "a\nc\ne\ng\ni\n"))))
-        (testing "adding a managed list that is all overridden"
-          (doseq [[path flag] (->> (repeat :off)
-                                   (map vector (map char (range 97 107))))]
-            (.. curator create (forPath (str "/managed/" path) (.getBytes (str flag)))))
-          (Thread/sleep 1000)
-          (merge-whitelist-caches! curator "/whitelist"
-                                   (:cache whitelist)
-                                   (:cache managed)
-                                   (:cache manual))
-          (Thread/sleep 1000)
-          (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr (:cache whitelist))
-            (is (= (.toString wtr)
-                   "a\nc\ne\ng\ni\n")))))))
-  (with-zk [zk]
-    (with-curator [zk curator]
-      (.start curator)
-      (doseq [path ["/whitelist" "/manual" "/managed"]]
-        (.. curator create (forPath path (byte-array 0))))
-      (let [[whitelist-state manual-state managed-state]
-            (map (fn [x] (atom 0)) (range 3))
-            whitelist (batch-sync curator "/whitelist" 100
-                                  (fn [_] (swap! whitelist-state inc)))
-            manual (batch-sync curator "/manual" 100
-                               (fn [_] (swap! manual-state inc)))
-            managed (batch-sync curator "/managed" 100
-                                (fn [_] (swap! managed-state inc)))]
-        (testing "start with nothing"
-          (Thread/sleep 1000)
-          (merge-whitelist-caches! curator "/whitelist"
-                                   (:cache whitelist)
-                                   (:cache managed)
-                                   (:cache manual))
-          (Thread/sleep 1000)
-          (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr (:cache whitelist))
-            (is (= (.toString wtr)
-                   ""))))
-        (testing "adding a managed list that is half on"
-          (doseq [[path flag] (->> (interleave (repeat :on) (repeat :off))
-                                   (map vector (map char (range 97 107))))]
-            (.. curator create (forPath (str "/managed/" path) (.getBytes (str flag)))))
-          (Thread/sleep 1000)
-          (merge-whitelist-caches! curator "/whitelist"
-                                   (:cache whitelist)
-                                   (:cache managed)
-                                   (:cache manual))
-          (Thread/sleep 1000)
-          (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr (:cache whitelist))
-            (is (= (.toString wtr)
-                   "a\nc\ne\ng\ni\n"))))
-        (testing "override everything"
-          (doseq [[path flag] (->> (repeat :on)
-                                   (map vector (map char (range 97 107))))]
-            (.. curator create (forPath (str "/manual/" path) (.getBytes (str flag)))))
-          (Thread/sleep 1000)
-          (merge-whitelist-caches! curator "/whitelist"
-                                   (:cache whitelist)
-                                   (:cache managed)
-                                   (:cache manual))
-          (Thread/sleep 1000)
-          (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr (:cache whitelist))
-            (is (= (.toString wtr)
-                   "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n"))))
-        (testing "manually override first half to off"
-          (doseq [[path flag] (->> (repeat :off)
-                                   (map vector (map char (range 97 102))))]
-            (.. curator setData (forPath (str "/manual/" path) (.getBytes (str flag)))))
-          (Thread/sleep 1000)
-          (merge-whitelist-caches! curator "/whitelist"
-                                   (:cache whitelist)
-                                   (:cache managed)
-                                   (:cache manual))
-          (Thread/sleep 1000)
-          (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr (:cache whitelist))
-            (is (= (.toString wtr)
-                   "f\ng\nh\ni\nj\n"))))
-        (testing "remove manual override for first half"
-          (doseq [path (map char (range 97 102))]
-            (.. curator delete (forPath (str "/manual/" path))))
-          (Thread/sleep 1000)
-          (merge-whitelist-caches! curator "/whitelist"
-                                   (:cache whitelist)
-                                   (:cache managed)
-                                   (:cache manual))
-          (Thread/sleep 1000)
-          (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr (:cache whitelist))
-            (is (= (.toString wtr)
-                   "a\nc\ne\nf\ng\nh\ni\nj\n"))))))))
+      (with-resources [cache (path-cache curator "/test" (async/chan (async/sliding-buffer 1)))]
+        (.start cache)
+        (testing "test"
+          (let [event1 {:state "ok" :description "test1"}
+                event2 {:state "critical" :description "test2"}]
+            (try
+              (is (zk-update-event! curator cache "/test" "host1" :managed "event1" event1))
+              (Thread/sleep 1000)
+              (is (= (:whitelist-data (get-host cache "/test" "host1"))
+                     {:manual-events {}
+                      :managed-events {"event1" event1}
+                      :managed-flag nil
+                      :manual-flag nil}))
+              (Thread/sleep 1000)
+              (is (zk-update-event! curator cache "/test" "host1" :managed "event2" event2))
+              (Thread/sleep 1000)
+              (is (zk-update-event! curator cache "/test" "host1" :managed "event2" event2))
+              (is (= (:whitelist-data (get-host cache "/test" "host1"))
+                     {:manual-events {}
+                      :managed-events {"event1" event1
+                                       "event2" event2}
+                      :managed-flag nil
+                      :manual-flag nil}))
+              (Thread/sleep 1000)
+              (is (zk-update-event! curator cache "/test" "host1" :managed "event1" nil))
+              (is (zk-update-event! curator cache "/test" "host1" :managed "event2" nil))
+              (Thread/sleep 1000)
+              (is (zk-update-event! curator cache "/test" "host1" :managed "event2" nil))
+              (is (= (:whitelist-data (get-host cache "/test" "host1"))
+                     {:manual-events {}
+                      :managed-events {}
+                      :managed-flag nil
+                      :manual-flag nil
+                      }))
+              (is (zk-update-flag! curator cache "/test" "host1" :managed "on"))
+              (Thread/sleep 1000)
+              (is (= (:whitelist-data (get-host cache "/test" "host1"))
+                     {:manual-events {}
+                      :managed-events {}
+                      :managed-flag "on"
+                      :manual-flag nil
+                      }))
+              (is (zk-update-flag! curator cache "/test" "host1" :manual "off"))
+              (Thread/sleep 1000)
+              (is (= (:whitelist-data (get-host cache "/test" "host1"))
+                     {:managed-events {}
+                      :manual-events {}
+                      :managed-flag "on"
+                      :manual-flag "off"
+                      })))))))))
+
+(defn test-recompute-manual-flag
+  [whitelist-data]
+  (testing "test"
+    (let [event1 {:state "ok" :time 0}
+          event2 {:state "critical" :time 1000}]
+      (let [whitelist empty-whitelist-data]
+        (is (= nil (-> whitelist
+                        recompute-manual-flag
+                        :manual-flag))))
+      (let [whitelist (set-event empty-whitelist-data :manual "event1" event1)]
+        (is (= "on" (-> whitelist
+                        recompute-manual-flag
+                        :manual-flag))))
+      (let [whitelist (set-event empty-whitelist-data :manual "event2" event2)]
+       (is (= "off" (-> whitelist
+                        recompute-manual-flag
+                        :manual-flag))))
+      (let [whitelist (-> empty-whitelist-data
+                          (set-event :manual "event1" event1)
+                          (set-event :manual "event2" event2))]
+        (is (= "off" (-> whitelist
+                         recompute-manual-flag
+                         :manual-flag)))))))
+
+(comment (run-tests))

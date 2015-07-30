@@ -35,13 +35,13 @@
      :output (fn [& params]
                (let [{riak-url :riak-url
                       bucket   :bucket} config
-                     failures (try
-                                (cache/cache-state-and-count-failures slave-host riak-url bucket)
-                                (catch Exception e
-                                  (log/error e "Failed to cache state.")
-                                  ;; Return a value strictly larger that the threshold.
-                                  (inc threshold)))]
-                 [{:ttl (* 5 (.getSeconds period))
-                   :service "cache state"
-                   :state (if (> failures threshold) "critical" "ok")
-                   :metric failures}]))}))
+                      failures (try
+                                 (cache/cache-state-and-count-failures slave-host riak-url bucket)
+                                 (catch Throwable e
+                                   (log/error e "Failed to cache state.")
+                                   ;; Return a value strictly larger that the threshold.
+                                   (inc threshold)))]
+                 {:ttl (* 5 (.getSeconds period))
+                  :service "cache state"
+                  :state (if (> failures threshold) "critical" "ok")
+                  :metric failures}))}))

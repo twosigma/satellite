@@ -16,7 +16,7 @@
   (:require [clojure.core.async :as async]
             [clojure.tools.logging :as log]
             [riemann.service :refer (Service ServiceEquiv)]
-            [satellite.time :as time]
+            [clj-time.core :as t]
             [satellite.whitelist :as whitelist]))
 
 (defrecord WhitelistSyncService
@@ -41,39 +41,49 @@
   (reload! [this new-core]
     (reset! core new-core))
   (start! [this]
-    (locking this
-      (when-not (realized? syncer)
-        ;; if the root Zookeeper whitelist node doesn't exist
-        ;; and you are leader, push the current whitelist to
-        ;; zookeeper
-        (let [curator @(:curator curator)]
-          (when (and (not (.. curator checkExists (forPath zk-whitelist-path)))
-                     (@leader?))
-            (whitelist/initialize-whitelist
-             (when (and initial-local-whitelist-path
-                        (.exists (java.io.File. initial-local-whitelist-path)))
-               (clojure.java.io/reader initial-local-whitelist-path))
-             curator
-             zk-whitelist-path))
-          (let [batch-every (-> 10 time/seconds)
-                batch-syncer (whitelist/batch-sync curator
-                                                   zk-whitelist-path
-                                                   batch-every
-                                                   (fn [cache]
-                                                     (with-open [wtr (clojure.java.io/writer
-                                                                      local-whitelist-path)]
-                                                       (whitelist/write-out-cache!
-                                                        wtr
-                                                        cache))))]
-            (deliver syncer batch-syncer))))))
+    (log/info "Starting whitelist service")
+    (try
+      (locking this
+        (when-not (realized? syncer)
+          ;; if the root Zookeeper whitelist node doesn't exist
+          ;; and you are leader, push the current whitelist to
+          ;; zookeeper
+          (let [curator @(:curator curator)]
+            (when (and (not (.. curator checkExists (forPath zk-whitelist-path)))
+                       (@leader?))
+              (.. curator create (forPath zk-whitelist-path)))
+            (let [sync-ch (async/chan (async/sliding-buffer 1))
+                  cache (whitelist/start-cache! curator zk-whitelist-path sync-ch)
+
+                  sync-period (t/seconds 10)
+                  shutdown-syncer (whitelist/start-batch-sync! curator
+                                                               cache
+                                                               zk-whitelist-path
+                                                               sync-ch
+                                                               sync-period
+                                                               (fn [cache]
+                                                                 (with-open [wtr (clojure.java.io/writer
+                                                                                  local-whitelist-path)]
+                                                                   (whitelist/write-out-cache!
+                                                                    wtr
+                                                                    cache))))
+
+                  shutdown-reaper (whitelist/start-reaper! curator
+                                                           cache
+                                                           zk-whitelist-path)]
+              (deliver syncer {:cache cache :sync shutdown-syncer :reaper shutdown-reaper})))))
+      (catch Throwable e
+        (log/error e "Failed to start whitelist service")))
+    (log/info "Whitelist service started"))
   (stop! [this]
     (locking this
       (.close (:cache @syncer))
-      (async/close! (:sync @syncer)))))
+      ((:sync @syncer))
+      ((:reaper @syncer)))))
 
 (defn whitelist-sync-service
   [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path
    leader?]
-  (WhitelistSyncService. curator zk-whitelist-path local-whitelist-path
+  (->WhitelistSyncService curator zk-whitelist-path local-whitelist-path
                          initial-local-whitelist-path leader?
                          (atom nil) (promise)))

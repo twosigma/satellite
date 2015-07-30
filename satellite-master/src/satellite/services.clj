@@ -19,7 +19,7 @@
             [satellite.services.whitelist :as whitelist]))
 
 (defn service
-  [{:keys [bucket whitelist-cache manual-cache curator riak-conn
+  [{:keys [bucket whitelist-cache curator riak-conn
            whitelist-hostname-pred
            zk-whitelist-path]}]
   (-> (compojure.core/routes
@@ -29,19 +29,20 @@
        (ANY "/stats.json" []
          (stats/stats))
        (ANY "/whitelist/host/:host" [host]
-         (whitelist/whitelist-host-st-rm-service
-          whitelist-cache
-          curator
-          zk-whitelist-path
-          host))
-       (ANY "/whitelist/host/:host/:flag" [host flag]
-         (whitelist/whitelist-host-flag-service
-          manual-cache
-          curator
-          zk-whitelist-path
-          whitelist-hostname-pred
-          host
-          flag))
+            (whitelist/whitelist-host-service
+             curator
+             whitelist-cache
+             zk-whitelist-path
+             whitelist-hostname-pred
+             host))
+       (ANY "/whitelist/host/:host/event/:eid" [host eid]
+            (whitelist/whitelist-host-event-service
+             curator
+             whitelist-cache
+             zk-whitelist-path
+             whitelist-hostname-pred
+             host
+             eid))
        (ANY "/whitelist/:flag" [flag]
          (whitelist/whitelist-list-service
           whitelist-cache
