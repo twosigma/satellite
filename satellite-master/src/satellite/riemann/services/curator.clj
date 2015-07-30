@@ -17,10 +17,12 @@
             [riemann.service :refer (Service ServiceEquiv)]
             [satellite.time :as time])
   (:import (org.apache.curator.framework CuratorFrameworkFactory)
-           (org.apache.curator.retry.BoundedExponentialBackoffRetry)))
+           (org.apache.curator.retry.BoundedExponentialBackoffRetry)
+           (org.apache.zookeeper.KeeperException)
+           (org.apache.zookeeper.KeeperException$Code)))
 
 (defrecord CuratorService
-           [zookeeper curator-retry-policy curator core]
+           [zookeeper zookeeper-root curator-retry-policy curator core]
   ServiceEquiv
   (equiv? [this other]
     (and (instance? CuratorService other)
@@ -34,23 +36,34 @@
   (reload! [this new-core]
     (reset! core new-core))
   (start! [this]
-    (locking this
-      (when-not (realized? curator)
-        (let [session-timeout (-> 3 time/minutes)
-              connection-timeout (-> 30 time/seconds)
-              curator-retry-policy (org.apache.curator.retry.BoundedExponentialBackoffRetry.
-                                    (:base-sleep-time-ms curator-retry-policy)
-                                    (:max-sleep-time-ms curator-retry-policy)
-                                    (:max-sleep-time-ms curator-retry-policy))
-              client (CuratorFrameworkFactory/newClient
-                      zookeeper session-timeout connection-timeout
-                      curator-retry-policy)]
-          (.. client start)
-          (deliver curator client)))))
+    (log/info "Starting curator service")
+    (try
+      (locking this
+        (when-not (realized? curator)
+          (let [session-timeout (-> 3 time/minutes)
+                connection-timeout (-> 30 time/seconds)
+                curator-retry-policy (org.apache.curator.retry.BoundedExponentialBackoffRetry.
+                                      (:base-sleep-time-ms curator-retry-policy)
+                                      (:max-sleep-time-ms curator-retry-policy)
+                                      (:max-retries curator-retry-policy))
+                client (CuratorFrameworkFactory/newClient
+                        zookeeper session-timeout connection-timeout
+                        curator-retry-policy)]
+            (.. client start)
+            (try
+              (.. client create (forPath zookeeper-root))
+              (catch org.apache.zookeeper.KeeperException ex
+                (when-not (= org.apache.zookeeper.KeeperException$Code/NODEEXISTS
+                             (.code ex))
+                  (throw ex))))
+            (deliver curator client))))
+      (catch Throwable e
+        (log/error e "Failed to start curator service")))
+    (log/info "Curator service started"))
   (stop! [this]
     (locking this
       (.close @curator))))
 
 (defn curator-service
-  [zookeeper curator-retry-policy]
-  (CuratorService. zookeeper curator-retry-policy (promise) (atom nil)))
+  [zookeeper zookeeper-root curator-retry-policy]
+  (CuratorService. zookeeper zookeeper-root curator-retry-policy (promise) (atom nil)))

@@ -32,6 +32,7 @@
   (reload! [this new-core]
     (reset! core new-core))
   (start! [this]
+    (log/info "Starting leader service")
     (locking this
       (when-not @watcher
         (let [close (:close this)
@@ -62,7 +63,8 @@
                             leader?*))
           (deliver leader? leader?*)
           (reset! watcher t)
-          (.start t)))))
+          (.start t))))
+    (log/info "Leader service started"))
   (stop! [this]
     (reset! close true)))
 

@@ -13,79 +13,120 @@
 ;; limitations under the License.
 
 (ns satellite.services.whitelist
-  (:require [satellite.whitelist :as whitelist]
+  (:require [clojure.tools.logging :as log]
+            [satellite.whitelist :as whitelist]
             [liberator.core :refer (resource)]
             [satellite.services.stats :as stats]
-            [satellite.time :as time]))
+            [clojure.data.json :as json]
+            [schema.core :as s]
+            [clojure.walk :as walk]
+            [clj-time.core :as t]
+            [clj-time.coerce :as tc]
+            [swiss.arrows :refer (-<> -<>>)])
+  (import java.util.concurrent.TimeUnit))
 
-(defn whitelist-host-flag-service
-  [manual-cache curator zk-whitelist-path whitelist-hostname-pred host flag]
+(defn str->period
+  [str]
+  (let [period->period-fn {"minute" t/minutes
+                           "hour" t/hours
+                           "day" t/days
+                           "week" t/weeks}]
+    (if-let [[_ num period] (re-find #"^(\d+)(minute|hour|day|week)s?$" str)]
+      (let [period-fn (get period->period-fn period)]
+        (period-fn (Integer/parseInt num)))
+      (throw (RuntimeException. (format "Cannot parse ttl %s" str))))))
+
+(defn add-time-and-ttl
+  [event]
+  (let [now (t/now)
+        set-ttl-if-exists (fn [event]
+                            (if-let [ttl (:ttl event)]
+                              (-> event
+                                  (assoc :ttl (-> ttl
+                                                  (str->period)
+                                                  (t/in-seconds))))
+                              event))]
+    (-> event
+        (assoc :time (->> now
+                          (tc/to-long)
+                          (.toSeconds TimeUnit/MILLISECONDS)))
+        (set-ttl-if-exists))))
+
+(defn hostname-malformed?
+  [whitelist-hostname-pred hostname]
+  (try
+    (let [addr (java.net.InetAddress/getByName hostname)]
+      (cond
+       (not (whitelist-hostname-pred hostname))
+       [true {::msg "Hostname did not pass user supplied predicate."}]
+
+       (.isReachable addr 1000)
+       [true {::msg (format "%s is not reachable." hostname)}]))
+    (catch java.net.UnknownHostException ex
+      [true {::msg (format " %s is not DNS resolvable or an IPv4/6 address." hostname)}])))
+
+(defn whitelist-host-service
+  [curator cache zk-whitelist-path whitelist-hostname-pred host]
   (resource
-   :available-media-types ["text/html" "application/json"]
-   :allowed-methods [:put]
+   :available-media-types ["application/json"]
+   :allowed-methods [:delete :get]
    :malformed? (fn [ctx]
-                 (condp = flag
-                   "on" (try
-                          (let [addr (java.net.InetAddress/getByName host)
-                                thirty-seconds (-> 30 time/seconds)]
-                            (cond
-                              (not (.isReachable addr thirty-seconds))
-                              [true {::error "Host is unreachable."}]
-                              (not (whitelist-hostname-pred host))
-                              [true {::error "Hostname did not pass user supplied predicate."}]))
-                          (catch java.net.UnknownHostException ex
-                            [true {::error "Host is not DNS resolvable or an IPv4/6 address."}]))
-                   "off" false
-                   :else [true {::error "Unsupported flag."}]))
-   :put! (fn [ctx]
-           (if (= flag "on")
-             (do
-               (whitelist/on-host manual-cache curator zk-whitelist-path host)
-               {::msg (str host " is now on.\n")})
-             (do
-               (whitelist/off-host manual-cache curator zk-whitelist-path host)
-               {::msg (str host " is now off.\n")})))
+                 (hostname-malformed? whitelist-hostname-pred host))
+   :delete! (fn [ctx]
+              (whitelist/delete-host curator zk-whitelist-path host)
+              {::msg (str host " was removed from the whitelist.\n")})
+   :handle-ok (fn [ctx]
+                (:whitelist-data (whitelist/get-host cache zk-whitelist-path host)))
    :handle-malformed (fn [ctx]
-                       (::error ctx))
+                       (::msg ctx))))
+
+(defn whitelist-host-event-service
+  [curator cache zk-whitelist-path whitelist-hostname-pred host event-id]
+  (resource
+   :available-media-types ["application/json"]
+   :allowed-methods [:post :delete]
+   :malformed? (fn [ctx]
+                 (or (hostname-malformed? whitelist-hostname-pred host)
+                     (when (#{:post} (get-in ctx [:request :request-method]))
+                       (try
+                         (let [data (-<> (slurp (get-in ctx [:request :body]))
+                                         (json/read-str :key-fn keyword)
+                                         (add-time-and-ttl)
+                                         (s/validate whitelist/ManualEvent <>))]
+                           [false {::data data}])
+                         (catch Throwable e
+                           [true {::msg (format "Exception: %s" (.getMessage e))}])))))
+   :post! (fn [ctx]
+           (let [event (get-in ctx [::data])]
+             (whitelist/zk-update-manual-event-recompute-flag!
+              curator cache zk-whitelist-path host event-id event)
+             {::msg (str host " updated.\n")}))
+   :delete! (fn [ctx]
+              (whitelist/zk-update-manual-event-recompute-flag!
+               curator cache zk-whitelist-path host event-id nil)
+              {::msg (str event-id " was removed from the whitelist.\n")})
+   :handle-ok (fn [ctx]
+                (:whitelist-data (whitelist/get-host cache zk-whitelist-path host)))
+   :handle-not-found (fn [ctx]
+                       (::msg ctx))
+   :handle-malformed (fn [ctx]
+                       (::msg ctx))
    :handle-created (fn [ctx]
                      (::msg ctx))))
-
-(defn whitelist-host-st-rm-service
-  [whitelist-cache curator zk-whitelist-path host]
-  (resource
-   :available-media-types ["text/html" "application/json"]
-   :allowed-methods [:get :delete]
-   :respond-with-entity? true
-   :exists? (fn [ctx]
-              (when-let [flag (whitelist/get-host whitelist-cache host)]
-                (cond
-                  (not (= :get (get-in ctx [:request :request-method]))) true
-                  (= flag :on) [true {::msg "On\n"}]
-                  (= flag :off) [false {::msg "Off\n"}]
-                  :else (throw (Exception.
-                                (str "Get request retrieved status " flag))))))
-   :delete! (fn [ctx]
-              (whitelist/rm-host curator zk-whitelist-path host)
-              {::msg (str host " was removed from the whitelist.\n")})
-
-   :handle-ok (fn [ctx]
-                (::msg ctx))
-   :handle-not-found (fn [ctx]
-                       (::msg ctx))))
 
 (defn whitelist-list-service
   [whitelist-cache flag]
   (resource
-   :available-media-types ["text/html" "application/json"]
+   :available-media-types ["application/json"]
    :allowed-methods [:get]
    :malformed? (fn [ctx]
                  (when-not (#{"on" "off" "all"} flag)
                    [true {::msg "Unsupported flag/filter."}]))
    :handle-ok (fn [ctx]
                 (let [hosts (condp = flag
-                              "on" (whitelist/get-on-hosts   whitelist-cache)
+                              "on" (whitelist/get-on-hosts whitelist-cache)
                               "off" (whitelist/get-off-hosts whitelist-cache)
                               "all" (whitelist/get-all-hosts whitelist-cache))]
-                  (clojure.string/join "\n" (sort hosts))))
+                  hosts))
    :handle-malformed (fn [ctx]
                        (::msg ctx))))

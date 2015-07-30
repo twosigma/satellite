@@ -36,35 +36,37 @@
   (reload! [this new-core]
     (reset! core new-core))
   (start! [this]
-    (locking this
-      (when-not @server
-        (let [{:keys [curator riak riak-conn syncer manual-syncer
-                      whitelist-hostname-pred
-                      zk-whitelist-path]} handler-opts
-              curator @curator
-              whitelist-cache (:cache @syncer)
-              manual-cache (:cache @manual-syncer)
-              handler (services/service
-                       {:bucket (:bucket riak)
-                        :whitelist-cache whitelist-cache
-                        :manual-cache manual-cache
-                        :curator curator
-                        :zk-whitelist-path zk-whitelist-path
-                        :riak-conn riak-conn
-                        :whitelist-hostname-pred whitelist-hostname-pred})]
-          (future
-            (try
-              (reset! server
-                      (qbits.jet.server/run-jetty
-                       {:port port
-                        :host (or host "127.0.0.1")
-                        :ring-handler (-> handler
-                                          wrap-params)
-                        :join? false
-                        :max-threads 10}))
-              (catch Throwable t
-                (log/error t "http-kit failed")
-                (System/exit 17))))))))
+    (log/info "Starting http server on port" port)
+    (try
+      (locking this
+        (when-not @server
+          (let [{:keys [curator riak riak-conn syncer
+                        whitelist-hostname-pred zk-whitelist-path]} handler-opts
+                        curator @curator
+                        whitelist-cache (:cache @syncer)
+                        handler (services/service
+                                 {:bucket (:bucket riak)
+                                  :whitelist-cache whitelist-cache
+                                  :curator curator
+                                  :zk-whitelist-path zk-whitelist-path
+                                  :riak-conn riak-conn
+                                  :whitelist-hostname-pred whitelist-hostname-pred})]
+            (future
+              (try
+                (reset! server
+                        (qbits.jet.server/run-jetty
+                         {:port port
+                          :host host
+                          :ring-handler (-> handler
+                                            wrap-params)
+                          :join? false
+                          :max-threads 10}))
+                (catch Throwable t
+                  (log/error t "http-kit failed")
+                  (System/exit 1)))))))
+      (catch Throwable t
+        (log/error t "Failed to start http service")))
+    (log/info "Http server started"))
   (stop! [this]
     (locking this
       (@server))))

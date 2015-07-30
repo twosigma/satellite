@@ -28,7 +28,6 @@
 
 (in-ns 'satellite.riemann.monitor)
 
-
 (def hostname (.. java.net.InetAddress getLocalHost getHostName))
 
 (defn get-state-map
@@ -130,12 +129,11 @@
      :metric num-leaders}))
 
 (defn mesos-service-events
-  "Turn every value from /stats.json into a trackable event."
+  "Turn every value from /metrics/snapshot into a trackable event."
   [mesos-master-url]
-  (let [metrics (:body (client/get (str mesos-master-url "/stats.json")
-                                   {:as :json-string-keys}))
-        transforms {"mem_percent" #(* 100 %)
-                    "cpus_percent" #(* 100 %)}]
+  (let [metrics (-> (str mesos-master-url "/metrics/snapshot")
+                    (client/get {:as :json-string-keys})
+                    :body)]
     (map
      (fn [[service metric]]
        {:host (:host mesos-master-url)
@@ -143,9 +141,7 @@
         :state "ok"
         :time (time/unix-now)
         :service (str "mesos/" service)
-        :metric (if-let [transform (get transforms "transforms")]
-                  (transform (double metric))
-                  (double metric))})
+        :metric metric})
      metrics)))
 
 (defn mesos-framework-events
@@ -226,13 +222,11 @@
         mesos-master-url (:mesos-master-url leader)]
     (riemann.service/start! tcp)
     (loop [time-last-checked (System/currentTimeMillis)]
-      (log/info (str "Checking for tasks after " time-last-checked))
       (let [time-last-checked'
             (try
               (if (riemann.config/leader?)
                 ;; Satellite leader
-                (let [_ (log/info (str "Tracking leader " mesos-master-url))
-                      state (get-state-map mesos-master-url)
+                (let [state (get-state-map mesos-master-url)
                       recent-tasks (state->recent-tasks state time-last-checked)
                       sid->host (state-map->slave-map state)]
                   ;; leader event

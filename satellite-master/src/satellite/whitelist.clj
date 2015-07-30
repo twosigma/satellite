@@ -21,7 +21,12 @@
            [satellite.services.stats :as stats]
            [riemann.config]
            [riemann.core]
-           [satellite.time :as time])
+           [schema.core :as s]
+           [schema.coerce :as coerce]
+           [clojure.data.json :as json]
+           [clojure.walk :as walk]
+           [clj-time.core :as t]
+           [clj-time.coerce :as tc])
   (import org.apache.curator.framework.CuratorFrameworkFactory
           org.apache.curator.framework.CuratorFramework
           org.apache.curator.retry.BoundedExponentialBackoffRetry
@@ -30,10 +35,72 @@
           org.apache.curator.framework.recipes.cache.PathChildrenCacheEvent$Type
           org.apache.curator.framework.recipes.cache.PathChildrenCacheListener
           org.apache.zookeeper.KeeperException
-          org.apache.zookeeper.KeeperException$Code))
+          org.apache.zookeeper.KeeperException$Code
+          java.util.concurrent.TimeUnit))
 
-;; todo, move to Curator 2.7.0, use TreeCache, use CAS of hosts
-;; this would allow scale for 10000x more hosts
+(def RiemannEvent
+  {(s/optional-key :host) s/Str
+   (s/optional-key :service) s/Str
+   :state (s/enum "ok" "critical" "warn" "expired")
+   (s/optional-key :time) (s/maybe s/Num)
+   (s/optional-key :description) (s/maybe s/Str)
+   (s/optional-key :tags) (s/maybe [s/Str])
+   (s/optional-key :metric) (s/maybe s/Num)
+   (s/optional-key :ttl) (s/maybe s/Num)
+   s/Keyword (s/maybe s/Str)})
+
+(def ManualEvent
+  RiemannEvent)
+
+(def ManagedEvent
+  RiemannEvent)
+
+(def ValidStr
+  (letfn [(not-too-long? [str] (<= (count str) 1024))]
+    (s/both s/Str (s/pred not-too-long? 'not-too-long?))))
+
+(def WhitelistData
+  {:managed-events {ValidStr ManagedEvent}
+   :manual-events {ValidStr ManualEvent}
+   :managed-flag (s/enum "on" "off")
+   :manual-flag (s/enum "on" "off")})
+
+(defn new-whitelist-data
+  []
+  {:managed-events {}
+   :manual-events {}
+   :managed-flag nil
+   :manual-flag nil})
+
+(defn ->full-path
+  [zk-path host]
+  (str zk-path
+       (when-not (.endsWith zk-path "/")
+         "/")
+       host))
+
+(defn full-path->host
+  [full-path]
+  (last (clojure.string/split full-path #"/")))
+
+(defn whitelist-data->bytes
+  [whitelist-data]
+  (-> whitelist-data
+      (json/write-str)
+      (.getBytes "UTF-8")))
+
+(defn bytes->whitelist-data
+    [bytes]
+    (-> bytes
+        (String. "UTF-8")
+        (json/read-str :key-fn keyword
+                       :value-fn (fn [k v]
+                                   (if (#{:manual-events :managed-events} k)
+                                     (->> v
+                                          (map (fn [[k1 v1]] [(subs (str k1) 1) v1]))
+                                          (into {}))
+                                     v)))))
+
 (defn path-cache
   "Create a PathChildrenCache with an attached childEvent listener.
 
@@ -51,17 +118,14 @@
                      (condp = (.getType event)
                        PathChildrenCacheEvent$Type/CHILD_ADDED
                        (do
-                         (log/info "Host added")
                          (async/go
                            (async/>! sync-ch :update)))
                        PathChildrenCacheEvent$Type/CHILD_REMOVED
                        (do
-                         (log/info "Host removed")
                          (async/go
                            (async/>! sync-ch :update)))
                        PathChildrenCacheEvent$Type/CHILD_UPDATED
                        (do
-                         (log/info "Host updated")
                          (async/go
                            (async/>! sync-ch :update)))
                        PathChildrenCacheEvent$Type/CONNECTION_LOST
@@ -85,207 +149,160 @@
         (addListener listener))
     cache))
 
-(defn childData->enum
-  "Read the data contained in the childData.
+(defn zk-delete!
+  "Delete host in zookeeper.
 
   Arguments:
-      c, childData
-
-  Returns:
-      clojure keyword"
-  [c]
-  (when c
-    (read-string (String. (.. c getData)))))
-
-(defn childData-on?
-  "Predicate, does the childData say the host should be on?"
-  [c]
-  (#{:on} (childData->enum c)))
-
-(defn childData-off?
-  "Predidate, does the childData say the host should be off?"
-  [c]
-  (#{:off} (childData->enum c)))
-
-(defn zkPath->host
-  "Take the fullpath and return the hostname"
-  [path]
-  (last (clojure.string/split path #"/")))
-
-(defn write-out-cache!
-  "Write out the cached whitelist to disk in sorted order.
-
-  Arguments:
-      wtr: writer
-      cache: PathChildrenCache
-
-  Returns:
-      nil"
-  [wtr cache]
-  (log/info "Writing out host cache")
-  (let [all-hosts (.. cache getCurrentData)
-        num-available-hosts (count all-hosts)
-        on-hosts (filter childData-on? all-hosts)
-        num-on-hosts (count on-hosts)
-        hostnames (map #(-> (.. % getPath) zkPath->host) on-hosts)]
-    (log/info (str "Whitelist will contain " num-on-hosts
-                   " of " num-available-hosts " hosts."))
-    (reset! stats/num-available-hosts num-available-hosts)
-    (reset! stats/num-hosts-up num-on-hosts)
-    (doseq [host (sort hostnames)]
-      (log/debug (str "On: " host))
-      (.write wtr host)
-      (.write wtr "\n"))))
-
-(defn batch-sync
-  "Create a curator cache and schedule recurring syncs of the whitelist.
-
-  Every sync-period seconds, check to see if a request to sync has been made,
-  and if so, call the sync-fn. The request to sync is made by the Curator
-  PathChildrenCache. The cache and the syncer are returned so the caller may
-  close or stop either.
-
-  Arguments:
-      curator: a Curator client
-      zk-whitelist-path: string, path on Zookeeper in which children correspond
-                                 to host status
-      local-whitelist-path: string, path to local disk, the Mesos whitelist
-      sync-period: long, milliseconds
-      sync-fn: fn (cache : PathChildrenCache) : Any
-
-  Returns:
-      {:cache, PathChildrenCache
-       :sync,  return of chime, a 0-arity function that, when called, stops the
-               schedule}"
-  [curator zk-whitelist-path sync-period sync-fn]
-  (let [sync-ch (async/chan (async/sliding-buffer 1))
-        cache   (path-cache curator zk-whitelist-path sync-ch)
-        _       (.start cache)
-        sync    (chime/chime-at (periodic/periodic-seq (t/now) (t/millis sync-period))
-                                (fn [_]
-                                  (async/go
-                                    ;; return value here is only for more self-
-                                    ;; documenting code; the keyword is not used
-                                    ;; anywhere
-                                    (async/alt!
-                                      sync-ch ([_]
-                                               (sync-fn cache)
-                                               :synced)
-                                      :default   :did-not-sync
-                                      :priority  true)))
-                                {:error-handler (fn [ex] (log/error ex))})]
-    {:cache cache
-     :sync  sync}))
-
-(defn stream-host-counts
-  [core cache sync-period]
-  (chime/chime-at (periodic/periodic-seq (t/now) (t/millis sync-period))
-                  (fn [_]
-                    (let [all-hosts (.. cache getCurrentData)
-                          num-available-hosts (count all-hosts)
-                          on-hosts (filter childData-on? all-hosts)
-                          num-on-hosts (count on-hosts)]
-                      (riemann.core/stream! @core
-                                            {:service "num-inventory-hosts"
-                                             :metric num-available-hosts})
-                      (riemann.core/stream! @core
-                                            {:service "num-on-hosts"
-                                             :metric num-on-hosts})))))
-
-(defn initialize-whitelist
-  "Copy current whitelist to zookeeper.
-
-  Caller should be leader, and it is assumed the zk-whitelist-path does not
-  exist on the zookeeper.
-
-  Arguments:
-      rdr: reader or nil
       curator: Curator client
       zk-whitelist-path: path on zookeeper with host key-values
+      host: host to delete
 
   Returns:
-      nil"
-  [rdr curator zk-whitelist-path]
-  (when (.. curator checkExists (forPath zk-whitelist-path))
-    (throw (ex-info "Whitelist node should not exist."
-                    {:zk-whitelist-path zk-whitelist-path})))
-  (log/info "Initializing whitelist")
-  (.. curator create (forPath zk-whitelist-path (byte-array 0)))
-  (when rdr
-    (with-open [rdr rdr]
-      (doseq [host (line-seq rdr)]
-        (.. curator create (forPath (str zk-whitelist-path "/" host)
-                                    (.getBytes (str :on))))))))
+      true if data is changed
+      false if data is unchanged"
+  [curator path]
+  (if (.. curator checkExists (forPath path))
+    (do (.. curator delete (forPath path))
+        true)
+    false))
 
-(defn update-host
-  "Update host status on zookeeper.
+(defn zk-set-or-create!
+  [curator path version bytes]
+  (if version
+    (.. curator setData (withVersion version) (forPath path bytes))
+    (.. curator create (forPath path bytes))))
 
-  Arguments:
-      flag: keyword, the status
-      curator: Curator client
-      zk-whitelist-path: path on zookeeper with host key-values
-      host: host to update
+(defn whitelist-data-on?
+  [whitelist-data]
+  (if-let [manual-flag (:manual-flag whitelist-data)]
+    (= "on" manual-flag)
+    (= "on" (:managed-flag whitelist-data))))
 
-  Returns:
-      nil"
-  [flag curator zk-whitelist-path host]
-  (let [flag (.getBytes (str flag))
-        full-path (str zk-whitelist-path
-                       (when-not (.endsWith zk-whitelist-path "/")
-                         "/")
-                       host)]
-    (try
-      (.. curator create (forPath full-path flag))
-      (catch org.apache.zookeeper.KeeperException ex
-        (if (= (.code ex) org.apache.zookeeper.KeeperException$Code/NODEEXISTS)
-          (.. curator setData (forPath full-path flag))
-          (throw ex))))))
+(def whitelist-data-off?
+  (complement whitelist-data-on?))
 
-(defn guarded-update-host
-  [flag pred cache curator zk-whitelist-path host]
-  (let [state (.. cache (getCurrentData (str zk-whitelist-path "/" host)))]
-    (when-not (pred state)
-      (let [named-state (when-not (nil? state) (name (childData->enum state)))]
-        (log/info "Turning" host named-state "->" (name flag))
-        (update-host flag curator zk-whitelist-path host)
-        (riemann.core/stream! @riemann.config/core
-                              {:metric (if (= flag :on) 1 -1)
-                               :service "satellite host count"
-                               :host host
-                               :time (time/unix-now)})))))
+(defn child-data-on?
+  [child-data]
+  (-> child-data
+      (.getData)
+      (bytes->whitelist-data)
+      (whitelist-data-on?)))
 
-(defn on-host
-  "Turn on host. WARNING: Only proceeds when cache says node is not already on."
-  [cache curator zk-whitelist-path host]
-  (guarded-update-host :on childData-on?
-                       cache curator zk-whitelist-path host))
+(def child-data-off?
+  (complement child-data-on?))
 
-(defn off-host
-  "Turn off host. WARNING: Only proceeds when cache says node is not already off."
-  [cache curator zk-whitelist-path host]
-  (guarded-update-host :off childData-off?
-                       cache curator zk-whitelist-path host))
+(defn get-host
+  ([cache zk-whitelist-path host]
+     (get-host cache zk-whitelist-path host nil))
+  ([cache zk-whitelist-path host default-value]
+     (let [full-path (->full-path zk-whitelist-path host)
+           child-data (.getCurrentData cache full-path)]
+       {:version (some-> child-data
+                         (.getStat)
+                         (.getVersion))
+        :whitelist-data (or (some-> child-data
+                                    (.getData)
+                                    (bytes->whitelist-data))
+                            default-value)})))
 
 (defn delete-host
-  "Update host status on zookeeper.
-
-  Arguments:
-      curator: Curator client
-      zk-whitelist-path: path on zookeeper with host key-values
-      host: host to update
-
-  Returns:
-      bool, true if successful, else false"
   [curator zk-whitelist-path host]
-  (let [full-path (str zk-whitelist-path
-                       (when-not (.endsWith zk-whitelist-path "/")
-                         "/")
-                       host)]
-    (when (.. curator checkExists (forPath full-path))
-      (.. curator delete (forPath full-path))
-      true)))
+  (zk-delete! curator (->full-path zk-whitelist-path host)))
 
-(def rm-host delete-host)
+(defn recompute-manual-flag
+  [whitelist-data]
+  (let [new-manual-flag (some->> whitelist-data
+                                 :manual-events
+                                 (map (fn [[_ event]] [(:time event) (:state event)]))
+                                 (sort-by first)
+                                 (last)
+                                 (second)
+                                 ({"ok" "on" "critical" "off"}))]
+    (assoc whitelist-data :manual-flag new-manual-flag)))
+
+(defn set-flag
+  [whitelist-data type flag]
+  (let [key (case type
+              :manual :manual-flag
+              :managed :managed-flag)
+        wd (if whitelist-data
+             whitelist-data
+             (new-whitelist-data))]
+    (assoc wd key flag)))
+
+(defn set-event
+  [whitelist-data type key event]
+  (let [wd (if whitelist-data
+             whitelist-data
+             (new-whitelist-data))
+        type-key (case type
+              :manual :manual-events
+              :managed :managed-events)]
+    (if event
+      (update-in wd [type-key] assoc key event)
+      (update-in wd [type-key] dissoc key))))
+
+(defn zk-swap!
+  "Swap operation on a zookeeper node."
+  [curator cache zk-whitelist-path host f]
+  (loop [n 0]
+    (when (>= n 4)
+      (throw (RuntimeException. "Failed to update host. Max conflict count exceeded.")))
+    (let [result (try
+                   (let [{:keys [version whitelist-data]} (get-host cache zk-whitelist-path host)
+                         whitelist-data' (f whitelist-data)]
+                     (zk-set-or-create! curator
+                                        (->full-path zk-whitelist-path host)
+                                        version
+                                        (whitelist-data->bytes whitelist-data'))
+                     whitelist-data')
+                   (catch KeeperException ex
+                     ;; We perform a read-modify-write here. If the value read is stale, we will get one
+                     ;; of the following exception, depending on whether or not the node exists in the cache
+                     (if (#{org.apache.zookeeper.KeeperException$Code/BADVERSION
+                            org.apache.zookeeper.KeeperException$Code/NODEEXISTS
+                            org.apache.zookeeper.KeeperException$Code/NONODE}
+                          (.code ex))
+                       (do
+                         (.rebuildNode cache (->full-path zk-whitelist-path host))
+                         :retry)
+                       (throw ex))))]
+      (if (= :retry result)
+        (recur (inc n))
+        result))))
+
+(defn zk-update-manual-event-recompute-flag!
+  [curator cache zk-whitelist-path host key event]
+  {:pre [(not (nil? key))
+         (or (nil? event)
+             (s/validate ManualEvent event))]}
+  (letfn [(f [whitelist-data]
+            (let [wd (if whitelist-data
+                       whitelist-data
+                       (new-whitelist-data))]
+              (-> wd
+                  (set-event :manual key event)
+                  (recompute-manual-flag))))]
+    (zk-swap! curator cache zk-whitelist-path host f)))
+
+(defn zk-update-flag!
+  [curator cache zk-whitelist-path host type flag]
+  {:pre [(#{:manual :managed} type)
+         (#{"on" "off"} flag)]}
+  (zk-swap! curator cache zk-whitelist-path host (fn [wd] (set-flag wd type flag))))
+
+(defn zk-update-event!
+  "Update an event for a host in zookeeper. If the event is nil, remove the event.
+
+  This function will always create the host node if it doesn't exist"
+  [curator cache zk-whitelist-path host type key event]
+  {:pre [(not (nil? key))
+         (#{:manual :managed} type)
+         (or (nil? event)
+             (case type
+               :manual (s/validate ManualEvent event)
+               :managed (s/validate ManagedEvent event)))]}
+  (zk-swap! curator cache zk-whitelist-path host (fn [wd] (set-event wd type key event))))
 
 (defn get-hosts
   "Get hosts from cache.
@@ -299,112 +316,179 @@
   [pred cache]
   (let [all-hosts (.. cache getCurrentData)
         filtered-hosts (filter pred all-hosts)]
-    (set (map #(-> (.. % getPath) zkPath->host) filtered-hosts))))
+    (->> all-hosts
+         (map (fn [cache]
+                (let [full-path (.. cache getPath)]
+                  [(-> cache
+                       (.. getPath)
+                       (full-path->host))
+                   (-> cache
+                       (.getData)
+                       (bytes->whitelist-data))])))
+         (filter #(pred (second %)))
+         (into {}))))
 
 (def get-all-hosts
-  (partial get-hosts identity))
+  (partial get-hosts (constantly true)))
 
 (def get-on-hosts
-  (partial get-hosts childData-on?))
+  (partial get-hosts whitelist-data-on?))
 
 (def get-off-hosts
-  (partial get-hosts childData-off?))
+  (partial get-hosts whitelist-data-off?))
 
-(defn get-host
-  "Get status of host from cache.
+(defn on-host
+  [curator cache zk-whitelist-path host]
+  (zk-update-flag! curator cache zk-whitelist-path host :managed "on"))
 
-  Todo: make one, not two lookups
+(defn off-host
+  [curator cache zk-whitelist-path host]
+  (zk-update-flag! curator cache zk-whitelist-path host :managed "off"))
+
+(defn persist-event
+  [curator cache zk-whitelist-path host key event]
+  (zk-update-event! curator cache zk-whitelist-path host :managed key event))
+
+(defn delete-event
+  [curator cache zk-whitelist-path host key]
+  (zk-update-event! curator cache zk-whitelist-path host :managed key nil))
+
+(defn write-out-cache!
+  "Write out the cached whitelist to disk in sorted order.
 
   Arguments:
+      wtr: writer
       cache: PathChildrenCache
-      host: hostname, String
 
   Returns:
-      :on, :off, or nil; nil when host is not in cluster inventory"
-  [cache host]
-  (cond
-    (not ((get-all-hosts cache) host)) nil
-    ((get-on-hosts cache) host) :on
-    :else :off))
+      nil"
+  [wtr cache]
+  (let [all-child-datas (.. cache getCurrentData)
+        num-all-child-datas (count all-child-datas)
+        on-child-datas (filter child-data-on? all-child-datas)
+        num-on-child-datas (count on-child-datas)
+        hostnames (map #(-> (.. % getPath) full-path->host) on-child-datas)]
+    (log/info (str "Whitelist will contain " num-on-child-datas
+                   " of " num-all-child-datas " hosts."))
+    (reset! stats/num-available-hosts num-all-child-datas)
+    (reset! stats/num-hosts-up num-on-child-datas)
+    (doseq [host (sort hostnames)]
+      (log/debug (str "On: " host))
+      (.write wtr host)
+      (.write wtr "\n"))))
 
-(defn write-to-zk!
-  [curator path bytes]
-  (try
-    (.. curator create (forPath path bytes))
-    (catch org.apache.zookeeper.KeeperException ex
-      (if (= (.code ex) org.apache.zookeeper.KeeperException$Code/NODEEXISTS)
-        (.. curator setData (forPath path bytes))
-        (throw ex)))))
-
-(defn merge-cd-into-whitelist!
-  "Take a childData and if different than what is in whitelist-cache, merge.
-
-  When we consider two childData, only apply the childData whose path is first.
-  Following merge semantics, cd-b is preferred to cd-a in case of equality.
-
-  Return the result of (compare host-a host-b) so caller knows who was synced."
-  ([curator zk-whitelist-path whitelist-cache cd]
-   (let [host (zkPath->host (.getPath cd))
-         path (str zk-whitelist-path "/" host)
-         whitelist-cd (.. whitelist-cache (getCurrentData path))]
-     ;; when not in inventory, or data is different
-     (when (or (nil? whitelist-cd)
-               (not (= (seq (.. whitelist-cd getData))
-                       (seq (.. cd getData)))))
-       (write-to-zk! curator path (.. cd getData)))
-     0))
-  ([curator zk-whitelist-path whitelist-cache cd-a cd-b]
-   (let [host-a (zkPath->host (.getPath cd-a))
-         host-b (zkPath->host (.getPath cd-b))
-         cmp (compare host-a host-b)]
-     ;; only do cd-a if comes before cd-b
-     (if (neg? cmp)
-       (merge-cd-into-whitelist! curator zk-whitelist-path whitelist-cache cd-a)
-       (merge-cd-into-whitelist! curator zk-whitelist-path whitelist-cache cd-b))
-     cmp)))
-
-(defn merge-whitelist-caches!
-  "Sync whitelist-cache with the managed and manual-caches. Choose manual cache
-  in case of conflict
+(defn start-cache!
+"Create a curator cache and start it
 
   Arguments:
-      curator: Curator client
-      zk-whitelist-path: String, prefix of whitelist-cache
-      whitelist-cache: PathChildrenCache, the cache of what Mesos interacts
-                       with, not public facing
-      managed-cache: PathChildrenCache, the automatically managed cache, public
-                     facing
-      manual-cache: PathChildrenCache, the manually managed cache, public facing
+      curator: a Curator client
+      zk-whitelist-path: string, path on Zookeeper in which children correspond
+                                 to host status
+      sync-ch async channel for notification
+  Returns:
+      PathChildrenCache"
+  [curator zk-whitelist-path sync-ch]
+  (let [cache (path-cache curator zk-whitelist-path sync-ch)
+        _ (.start cache)]
+    cache))
 
-  Returns
-      :done, when completed"
-  [curator zk-whitelist-path whitelist-cache managed-cache manual-cache]
-  (loop [[manual-cd  & manual-cds
-          :as manual-cdss]  (.getCurrentData manual-cache)
-         [managed-cd & managed-cds
-          :as managed-cdss] (.getCurrentData managed-cache)]
-    (cond
-      (and (nil? manual-cd)
-           (nil? managed-cd))
-      :done
-      (nil? manual-cd)
-      (recur managed-cdss
-             nil)
-      (nil? managed-cd)
-      (do (merge-cd-into-whitelist! curator zk-whitelist-path whitelist-cache
-                                    manual-cd)
-          (recur manual-cds
-                 nil))
-      :else
-      (let [cmp (merge-cd-into-whitelist! curator zk-whitelist-path whitelist-cache
-                                          managed-cd manual-cd)]
-        (cond
-          ;; peel managed
-          (neg? cmp) (recur manual-cdss
-                            managed-cds)
-          ;; peel manual
-          (pos? cmp) (recur manual-cds
-                            managed-cdss)
-          ;; peel both
-          :else (recur manual-cds
-                       managed-cds))))))
+(defn start-batch-sync!
+"Create a schedule recurring syncs of the whitelist.
+
+  Every sync-period seconds, check to see if a request to sync has been made,
+  and if so, call the sync-fn. The request to sync is made by the Curator
+  PathChildrenCache.
+
+  Arguments:
+      curator: a Curator client
+      cache: path cache
+      zk-whitelist-path: string, path on Zookeeper in which children correspond
+                                 to host status
+      sync-ch: async channel for notification
+      sync-period: sync period
+      sync-fn: fn (cache : PathChildrenCache) : Any
+
+  Returns:
+       return of chime, a 0-arity function that, when called, stops the schedule"
+  [curator cache zk-whitelist-path sync-ch sync-period sync-fn]
+  (chime/chime-at (periodic/periodic-seq (t/now) sync-period)
+                  (fn [_]
+                    (async/go
+                     ;; return value here is only for more self-
+                     ;; documenting code; the keyword is not used
+                     ;; anywhere
+                     (async/alt!
+                      sync-ch ([_]
+                                 (sync-fn cache)
+                                 :synced)
+                      :default   :did-not-sync
+                      :priority  true)))
+                  {:error-handler (fn [ex] (log/error ex))}))
+
+(defn start-reaper!
+  [curator cache zk-whitelist-path]
+  (letfn [(event-expired? [now event]
+            (if-let [ttl (:ttl event)]
+              (t/after? now
+                        (->>  (:time event)
+                              (+ ttl)
+                              (.toMillis TimeUnit/SECONDS)
+                              (tc/from-long)))))]
+    (chime/chime-at (periodic/periodic-seq (t/now) (t/minutes 1))
+                    (fn [now]
+                      (let [all-child-datas (.getCurrentData cache)]
+                        (doseq [child-data all-child-datas]
+                          (let [hostname (-> child-data
+                                             (.getPath)
+                                             (full-path->host))
+                                expired-event-ids (->> child-data
+                                                    (.getData)
+                                                    (bytes->whitelist-data)
+                                                    :manual-events
+                                                    (filter (fn [[k v]]
+                                                              (event-expired? now v)))
+                                                    (map first))]
+                            (doseq [id expired-event-ids]
+                              (log/info "Expiring event for host " hostname ":" id)
+                              (zk-update-manual-event-recompute-flag! curator
+                                                                      cache
+                                                                      zk-whitelist-path
+                                                                      hostname
+                                                                      id
+                                                                      nil))))))
+                    {:error-handler (fn [ex] (log/error ex))})))
+
+(comment
+  (def client-atom (atom nil))
+  (let [zookeeper "rers1.pit.twosigma.com:2181,rers2.pit.twosigma.com:2181,rers3.pit.twosigma.com:2181"
+        session-timeout (-> 3 time/minutes)
+        connection-timeout (-> 30 time/seconds)
+        curator-retry-policy (org.apache.curator.retry.BoundedExponentialBackoffRetry.
+                              1000
+                              10
+                              3000)
+        client (CuratorFrameworkFactory/newClient
+                zookeeper session-timeout connection-timeout
+                curator-retry-policy)]
+    (reset! client-atom client)
+    )
+  (. @client-atom start)
+  (def curator @client-atom)
+  (def sync-ch (async/chan (async/sliding-buffer 1)))
+  (def cache (path-cache curator "/whitelist-ljin" sync-ch))
+  (def manual-cache (path-cache curator "/whitelist-manual-ljin" sync-ch))
+  (.. curator checkExists (forPath "/whitelist-ljin"))
+
+  (.. curator setData (withVersion 4) (forPath "/whitelist-ljin/dummy-host" (byte-array 0)))
+  (.. cache start)
+  (.. manual-cache start)
+
+  (.getCurrentData cache "/whitelist-ljin/dummy-host")
+
+  (-> cache (.getCurrentData "/whitelist-ljin/dummy-host") (.getStat) (.getVersion))
+
+  (get-host curator cache "/whitelist-ljin" "dummyhost2")
+
+  (delete-host curator cache "/whitelist-ljin" "dummyhost2")
+
+  (get-off-hosts cache))

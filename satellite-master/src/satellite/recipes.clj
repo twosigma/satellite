@@ -24,10 +24,10 @@
 ;; function gets called before it is truly defined (ie, there is a race) then I
 ;; want to know about it.
 
-(defn on-host [host]
-  (warn "Tried to turn on" host "but on-host hasn't been defined yet"))
-(defn off-host [host]
-  (warn "Tried to turn off" host "but off-host hasn't been defined yet"))
+(declare on-host)
+(declare off-host)
+(declare persist-event)
+(declare delete-event)
 
 (def alive?
   (complement expired?))
@@ -98,39 +98,15 @@
                   (tag "resolve"
                        (forward client))))))
 
-(defn ensure-all-tests-on-whitelisted-host-pass
-  "Filter to only stable states, then check if all tests for
-  a host pass"
-  []
-  (pipe -
-        ;; filter stable state by host service
-        (by [:host :service]
-            (stable 10 :state
-                    -))
-        ;; join and re-fork by host
-        (by [:host]
-            ;; keep the most recent host/service events -- since
-            ;; we've forked by host, this means keep most recent
-            ;; service event
-            (coalesce 15
-                      ;; check if all tests pass
-                      (fn [es]
-                        (let [host (:host (first es))]
-                          (if-let [bad-test (some
-                                             (fn [e] (when-not (#{"ok"} (:state e))
-                                                       e))
-                                             es)]
-                            (do
-                              (warn "Turning off host" (:host bad-test)
-                                    "due to failed test:" bad-test)
-                              (off-host host))
-                            (on-host host))))))))
-
-(defn mark-critical-forward-and-turn-off-host
-  ([client]
-   (mark-critical-forward-and-turn-off-host "Critical event:"))
-  ([client msg]
-   (with :state "critical"
-         client
-         #(warn (str msg ": " %))
-         #(off-host (:host %)))))
+(defn ensure-all-tests-pass
+  [es]
+  (let [host (:host (first es))]
+    (if-let [bad-test (some
+                       (fn [e] (when-not (#{"ok"} (:state e))
+                                 e))
+                       es)]
+      (do
+        (warn "Turning off host" host
+              "due to failed test:" bad-test)
+        (off-host host))
+      (on-host host))))
