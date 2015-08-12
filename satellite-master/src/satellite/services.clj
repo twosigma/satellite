@@ -26,7 +26,7 @@
        ;; task metadata endpoint; requires riak
        (ANY "/state.json" []
          (state/tasks-metadata riak-conn bucket))
-       (ANY "/stats.json" []
+       (ANY "/metrics/snapshot" []
          (stats/stats))
        (ANY "/whitelist/host/:host" [host]
             (whitelist/whitelist-host-service

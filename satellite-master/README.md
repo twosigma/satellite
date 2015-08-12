@@ -33,22 +33,28 @@ Please rely on the status code and not the response body text. The latter is
 meant for humans and is very subject to change! If you believe either a status
 code or body could be improved, issues and pull requests are very welcome.
 
-### `GET /stats.json`
+### `GET /metrics/snapshot`
 
-Return a JSONObject with  general statistics about the cluster.
+Return a JSONObject with general statistics about the cluster; the
+output type will be {String : Number}. Note that these metrics are
+different than those provided by the Mesos /metrics/snapshot
+endpoint. The intention of this Satellite endpoint is to mirror the
+Mesos API, hinting that it provides point-in-time metrics about the
+state of the cluster. Eventually we will allow users to configure what
+metrics are exposed here through the Riemann config.
 
 Example:
 
 ```bash
-curl satellite/stats.json
+curl satellite/metrics/snapshot
 ```
 
 Response:
 
 ```json
 {
- "test-key": "val1",
- "second-key": "val2"
+ "test-key": val1,
+ "second-key": val2
 }
 ```
 
