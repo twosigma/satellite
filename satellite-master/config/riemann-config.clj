@@ -24,26 +24,30 @@
  indx
  (where (service #"satellite.*")
         prn)
-
- ;; if we stop receiving a test from a host, remove
- ;; that host from the whitelist
  (where (service #"mesos/slave.*")
         prn
-        (where* expired?
-                #(off-host (:host %))
+        ;; if a host/service pair changes state, update global state
+        (changed-state
+         (where (state "ok")
+                delete-event
                 (else
-                 (ensure-all-tests-on-whitelisted-host-pass))))
+                 persist-event)))
+        ;; If we stop receiving any test from a host, remove that host
+        ;; from the whitelist. We don't want to send tasks to a host
+        ;; that is (a) experiencing a network partition or (b) whose
+        ;; tests are timing-out. If it is (c) that the satellite-slave
+        ;; process is down, this at least warrants investigation.
+        (where* expired?
+                (fn [event]
+                  (warn "Removing host due to expired event" (:host event))
+                  (off-host (:host event)))
+                ;; Otherwise make sure all tests pass on each host
+                (else
+                 (coalesce 60
+                           ensure-all-tests-pass))))
 
  ;; if less than 70% of hosts registered with mesos are
  ;; on the whitelist, alert with an email
  (where (and (service #"mesos/prop-available-hosts")
              (< metric 0.7))
-        (email "foo@example.com"))
-
- ;; if more than 10 hosts (net) have gone down in the last
- ;; five minutes, alert with an email
- (where (service #"satellite host count")
-        (coalesce (* 60 5)
-                  prn
-                  (where* (fn [es] (< (:metric (folds/sum es)) 10)
-                          (email "foo@example.com"))))))
+        (email "foo@example.com")))
