@@ -18,8 +18,8 @@
   :license {:name "Apache License, Version 2.0"
             :url "http://opensource.org/licenses/apache2.0.php"}
   :dependencies [[cc.qbits/jet "0.5.4"]
-                 [cheshire "5.3.1"]
-                 [clj-http "0.9.2"]
+                 [cheshire "5.5.0"]
+                 [clj-http "1.1.2"]
                  [clj-logging-config "1.9.12"]
                  [com.cemerick/url "0.1.1"]
                  [com.novemberain/welle "3.0.0"]
@@ -46,7 +46,7 @@
                  ;; check https://github.com/Prismatic/plumbing/issues/74
                  ;; for progress
                  [prismatic/schema "0.3.3"]
-                 [riemann "0.2.8"]]
+                 [riemann "0.2.10"]]
   :plugins [[lein-cljfmt "0.1.10"]]
   :aot [satellite.core]
   :main satellite.core
