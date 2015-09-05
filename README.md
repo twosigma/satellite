@@ -2,6 +2,9 @@
 
 Satellite monitors, alerts on, and self-heals your Mesos cluster.
 
+## Quick Start
+Satellite has two server components: the Satellite Masters and the Satellite Slaves. Instructions for building and deploying each components are located in the README.md files of the component directories.
+
 ## Overview
 
 Satellite currently serves three functions, each adding functionality to Mesos:
