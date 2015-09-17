@@ -7,6 +7,18 @@ Java (tested against Oracle JDK 1.7), Mesos, Zookeeper,
 
 If you are using the cached metadata feature, Riak 1.4+ is also necessary.
 
+## Configuration
+
+It is recommended to replace all occurances of localhost with the
+server's host name that the Satellite master is installed on.
+
+Make sure local-whitelist-path is pointing to your Mesos master
+whitelist.
+
+Update riemann-tcp-server-options to the server's name or IP. localhost
+is the default setting but that will not allow other servers to connect 
+to the leader via Riemann.
+
 ## Installation
 
 Run `lein release-jar` to compile a jar in `./target`. Copy a copy of the
@@ -18,7 +30,7 @@ Run each jar using `java` as usual, with the single argument being a path to
 your config file. For example,
 
 ```
-java -jar satellite.jar config.clj
+java -jar ./target/satellite.jar ./config/satellite-config.clj
 ```
 
 ## Security
@@ -28,6 +40,9 @@ communication is unnecessary because the information from Slaves--host
  metrics--is not considered confidential.
 
 ## REST API
+
+Satellite's REST API can be accessed on port 5001. You can change the port
+using the config parameter service-port.
 
 Please rely on the status code and not the response body text. The latter is
 meant for humans and is very subject to change! If you believe either a status
@@ -46,7 +61,7 @@ metrics are exposed here through the Riemann config.
 Example:
 
 ```bash
-curl satellite/metrics/snapshot
+curl http://satellite1.example.com:5001/metrics/snapshot
 ```
 
 Response:
@@ -76,7 +91,7 @@ Examples:
 Request:
 
 ```bash
-curl example.com/whitelist/all
+curl http://satellite1.example.com:5001/whitelist/all
 ```
 
 Response:
@@ -194,7 +209,7 @@ Example:
 Request:
 
 ```bash
-curl -H "Content-Type: application/json" -X POST -d '{"ttl": "7day" "state": "critical" "description": "reconfiguraton"}' example.com:5051/whitelist/host/my.dope.host/event/manual
+curl -H "Content-Type: application/json" -X POST -d '{"ttl": "7day" "state": "critical" "description": "reconfiguraton"}' example.com:5001/whitelist/host/my.dope.host/event/manual
 ```
 
 Response:
@@ -208,7 +223,7 @@ my.dope.host updated
 Delete manual 'event' on 'host'. This will trigger revaluation of manual flag.
 
 ```bash
-curl -X DELETE example.com:5051/whitelist/host/my.dope.host/event/manual
+curl -X DELETE example.com:5001/whitelist/host/my.dope.host/event/manual
 ```
 
 ### `GET /state.json`
@@ -248,6 +263,41 @@ Rather than call-and-response of the Mesos slaves, Satellite runs a Riemann TCP
 server to receive events from the Satellite Slaves. Even though each Satellite
 receives the Satellite Slave event stream, only the Satellite Master tracking
 the leader Mesos master will put it into its own stream.
+
+## Debugging
+
+The easiest way to make sure the Satellite leader is receiving events,
+is to change the riemann-config.clj file to just:
+
+```
+(streams prn)
+```
+
+This will print all events to STDOUT.
+
+To make sure the leader can receive events from clients, send an event
+with your favorite Riemann client either from the current leader or from
+one of the servers in your cluster.
+
+```
+$ cd ~/satellite/satellite-slave
+~/satellite/satellite-slave $ lein repl
+satellite-slave.core=> (require '[riemann.client :as r])
+#'satellite-slave.core/r
+satellite-slave.core=> (def c (r/tcp-client {:host "satellite1.example.com" :port 5555}))
+#'satellite-slave.core/c
+satellite-slave.core=> (-> c (r/send-event {:service "foo" :state "ok"})
+                  #_=> (deref 5000 ::timeout))
+#riemann.codec.Msg{:ok true, :error nil, :events [], :query nil, :decode-time 10273872699458978}
+```
+
+If you cannot connect using the host name, you'll see an error message
+like this:
+
+```
+IOException no channels available com.aphyr.riemann.client.TcpTransport.sendMessage (TcpTransport.java:293)
+
+```
 
 # Nomenclature
 
