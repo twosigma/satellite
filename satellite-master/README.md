@@ -7,22 +7,23 @@ Java (tested against Oracle JDK 1.7), Mesos, Zookeeper,
 
 If you are using the cached metadata feature, Riak 1.4+ is also necessary.
 
-## Configuration
-
-It is recommended to replace all occurances of localhost with the
-server's host name that the Satellite master is installed on.
-
-Make sure local-whitelist-path is pointing to your Mesos master
-whitelist.
-
-Update riemann-tcp-server-options to the server's name or IP. localhost
-is the default setting but that will not allow other servers to connect 
-to the leader via Riemann.
-
 ## Installation
 
 Run `lein release-jar` to compile a jar in `./target`. Copy a copy of the
 `standalone` jar to each Mesos master host.
+
+## Configuration
+
+It is recommended to replace all occurances of localhost with the
+server's host name that the Satellite master is installed on assuming
+you'd like to connect to things like the API outside of localhost.
+
+Make sure local-whitelist-path is pointing to your Mesos master
+whitelist. Default is /etc/mesos-master/whitelist.
+
+Update riemann-tcp-server-options to the server's name or IP. localhost
+is the default setting but that will not allow other servers to connect 
+to the leader via Riemann.
 
 ## Running
 
