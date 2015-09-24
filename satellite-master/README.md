@@ -19,7 +19,7 @@ server's host name that the Satellite master is installed on assuming
 you'd like to connect to things like the API outside of localhost.
 
 Make sure local-whitelist-path is pointing to your Mesos master
-whitelist. Default is /etc/mesos-master/whitelist.
+whitelist. Default is /etc/mesos/whitelist.
 
 Update riemann-tcp-server-options to the server's name or IP. localhost
 is the default setting but that will not allow other servers to connect 
