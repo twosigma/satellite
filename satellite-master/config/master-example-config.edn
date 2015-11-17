@@ -1,0 +1,19 @@
+{:riemann-config "config/riemann-config.clj"
+ :riemann-tcp-server-options {:host
+                              "127.0.0.1"}
+ :sleep-time 60000
+ ; no longer a URL; just need to parse it to a URL:
+ :mesos-master-url "http://localhost:5050"
+ :riak {:endpoint "http://uri/to/riak"
+        :bucket "bucket-name"}
+ :service-host "127.0.0.1"
+ :service-port 5001
+ :zookeeper "zk1:port,zk2:port,zk3:port"
+ :zookeeper-root "/satellite"
+ :curator-retry-policy {:base-sleep-time-ms 100
+                        :max-sleep-time-ms 120000
+                        :max-retries 10}
+ :local-whitelist-path "whitelist"
+ ;; in static edn, this should be the name of a symbol corresponding
+ ;; to a function that accepts 1 argument
+ :whitelist-hostname-pred "identity"}

@@ -19,6 +19,7 @@
             [clojurewerkz.welle.core :as wc]
             [clojure.tools.logging :as log]
             [liberator.core :refer (resource)]
+            [clojure.edn :as edn]
             [plumbing.core :refer (fnk)]
             [plumbing.core]
             [plumbing.graph :as graph]
@@ -209,15 +210,31 @@
                                   "'.'yyyy-MM-dd")
                             :level :info}))
 
+(defn load-settings
+  [config]
+  (if (and config
+           (.exists (java.io.File. config)))
+    (do (log/info (str "Reading config from file: " config))
+        (if (.endsWith config ".clj")
+          (load-file config)
+          (let [parsed-settings (cond
+                                  (.endsWith config ".edn")
+                                  (do
+                                    (prn (-> config slurp))
+                                    (-> config slurp edn/read-string)
+                                    )
+                                  )]
+            parsed-settings
+            )
+          ))
+    (prn (str "Using default settings" settings)))
+  )
+
 (defn -main
   [& [config args]]
   (init-logging)
   (log/info "Starting Satellite")
-  (if (and config
-           (.exists (java.io.File. config)))
-    (do (log/info (str "Reading config from file: " config))
-        (load-file config))
-    (log/info (str "Using default settings" settings)))
+  (load-settings config)
   (s/validate settings-schema settings)
   ((graph/eager-compile (app (map->graph settings))) {}))
 

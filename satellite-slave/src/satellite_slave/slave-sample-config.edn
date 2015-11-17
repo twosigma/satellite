@@ -1,0 +1,28 @@
+{
+ ;; shouldn't the mesos-work-dir var be configurable via edn also?
+ :mesos-work-dir "/tmp/mesos"
+ :satellites [{:host "satellite.master.1.example.com"}
+              {:host "satellite.master.2.example.com"}]
+ :service "mesos/slave/"
+ ;; inline clojure code not supported in static edn config.
+ ;; since every comet would require at least a simple function
+ ;; to examine output, static config pretty much limits one to using
+ ;; comet-generating functions already defined in satellite-slave.recipes
+ ;; (or otherwise included in the deployed jar).  If there is demand for
+ ;; configuration without clojure code, isn't this what we are left with?
+ :comets [{
+           ;; always in seconds. Is there a common use case that would need another Period unit?
+           :every 60
+           ;; name of a symbol corresponding to a comet-generating recipe
+           :comet "satellite-slave.recipes/free-memory"
+           ;; the parameters to the named comet-generating function OTHER
+           ;; than the period length (which is assumed to be the last param)
+           :params [50]
+           }
+          {:every 40
+           :comet "satellite-slave.recipes/percentage-used"
+           :params [90 "/tmp"]}
+          {:every 60
+           :comet "satellite-slave.recipes/num-uninterruptable-processes"
+           :params [10]}]
+ :safe-env true}
