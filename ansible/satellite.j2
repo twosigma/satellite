@@ -1,0 +1,111 @@
+# Copyright 2015 TWO SIGMA OPEN SOURCE, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#!/bin/bash
+
+START_SCRIPT={{ init_script }}
+PID_FILE={{ pid_file }}
+
+# ***********************************************
+# ***********************************************
+
+ARGS="{{ initfile_args }}" # optional start script arguments
+DAEMON={{ java_executable }}
+
+# colors
+red='\e[0;31m'
+green='\e[0;32m'
+yellow='\e[0;33m'
+reset='\e[0m'
+
+echoRed() { echo -e "${red}$1${reset}"; }
+echoGreen() { echo -e "${green}$1${reset}"; }
+echoYellow() { echo -e "${yellow}$1${reset}"; }
+
+start() {
+    export PATH=$PATH:{{ satellite_install_dir }}
+    nohup $DAEMON $ARGS > {{ init_script }}.log 2>&1 &
+    PID=$!
+    disown -a
+}
+
+case "$1" in
+start)
+    if [ -f $PID_FILE ]; then
+        PID=`cat $PID_FILE`
+        if [ -z "`ps axf | grep ${PID} | grep -v grep`" ]; then
+            start
+        else
+            echoYellow "Already running [$PID]"
+            exit 0
+        fi
+    else
+        start
+    fi
+    if [ -z "`ps axf | grep ${PID} | grep -v grep`" ]; then
+        echoRed "Failed starting"
+        exit 3
+    else
+        echo $PID > $PID_FILE
+        echoGreen "Started [$PID]"
+        exit 0
+    fi
+;;
+
+status)
+    if [ -f $PID_FILE ]; then
+        PID=`cat $PID_FILE`
+        if [ -z "`ps axf | grep ${PID} | grep -v grep`" ]; then
+            echoRed "Not running (process dead but pidfile exists)"
+            exit 0
+        else
+            echoGreen "Running [$PID]"
+            exit 0
+        fi
+    else
+        echoRed "Not running"
+        exit 3
+    fi
+;;
+
+stop)
+    if [ -f $PID_FILE ]; then
+        PID=`cat $PID_FILE`
+        if [ -z "`ps axf | grep ${PID} | grep -v grep`" ]; then
+            echoRed "Not running (process dead but pidfile exists)"
+            echoYellow "Removing pidfile."
+            rm $PID_FILE
+            exit 1
+        else
+            PID=`cat $PID_FILE`
+            kill $PID
+            echoGreen "Stopped [$PID]"
+            rm -f $PID_FILE
+            exit 0
+        fi
+    else
+        echoRed "Not running (pid not found)"
+        exit 0
+    fi
+;;
+
+restart)
+    $0 stop
+    $0 start
+;;
+
+*)
+    echo "Usage: $0 {status|start|stop|restart}"
+    exit 1
+esac

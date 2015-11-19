@@ -1,0 +1,36 @@
+# Copyright 2015 TWO SIGMA OPEN SOURCE, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: deploy slaves
+  hosts: satellite_slaves
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  vars:
+    initfile_args: -jar {{ satellite_install_dir }}/{{ slave_jar }} {{ satellite_install_dir }}{{ slave_config_file }}
+  tasks:
+    - name: copy slave jar
+      copy: src={{ satellite_repo_root }}/satellite-slave/target/{{ slave_jar }} dest={{ satellite_install_dir }}
+
+    - name: place slaves config
+      template: src={{ satellite_repo_root }}/ansible/{{ slave_config_file }}.j2 dest={{ satellite_install_dir }}/{{ slave_config_file }}
+
+    - name: place slaves init script
+      template: src={{ satellite_repo_root }}/ansible/satellite.j2 dest={{ satellite_install_dir }}/satellite mode=0755
+
+    - name: place recipes script
+      copy: src={{ satellite_repo_root }}/satellite-slave/bin/satellite-recipes dest={{ satellite_install_dir }}/satellite-recipes mode=0755
+
+    - name: restart slaves
+      shell: "{{ satellite_install_dir }}/satellite restart"

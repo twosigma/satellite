@@ -1,0 +1,37 @@
+# Copyright 2015 TWO SIGMA OPEN SOURCE, LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: deploy masters
+  hosts: satellite_masters
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  vars:
+     initfile_args: -jar {{ satellite_install_dir }}/{{ master_jar }} {{ satellite_install_dir}}/{{ master_config_file }}
+  tasks:
+
+    - name: copy master jar
+      copy: src={{ satellite_repo_root }}/satellite-master/target/{{ master_jar }} dest={{ satellite_install_dir }}/
+
+    - name: place init script
+      template: src={{ satellite_repo_root }}/ansible/satellite.j2 dest={{ satellite_install_dir }}/satellite mode=0755
+
+    - name: place masters config
+      template: src={{ satellite_repo_root }}/ansible/{{ master_config_file }}.j2 dest={{ satellite_install_dir }}/{{ master_config_file }}
+
+    - name: place riemann config
+      copy: src={{ satellite_repo_root }}/satellite-master/config/riemann-config.clj dest={{ satellite_install_dir }}/
+
+    - name: restart masters
+      shell: "{{ satellite_install_dir }}/satellite restart"
