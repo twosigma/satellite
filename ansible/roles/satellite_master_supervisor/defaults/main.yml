@@ -1,0 +1,2 @@
+---
+supervisor_dir: "{{ satellite_install_dir }}/supervisor"

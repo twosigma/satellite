@@ -80,6 +80,11 @@ We've provided some very, very basic recipes and are interested in adding more,
 so please send a pull request if you think anything would serve the larger
 community.
 
+## Deploying Satellite
+
+If you're deploying Satellite to a Mesos cluster, you might find that installing and configuring it on all of your hosts involves some repetitive busy work.
+To help you automate these tasks, we've provided some [Ansible Roles](ansible/).
+
 ## Contributing
 We need all contributors to fill out our Contributor License Agreement found in
 `/cla` before we can accept any code or pull requests.

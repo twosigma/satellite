@@ -1,0 +1,10 @@
+[Unit]
+Description=Satellite, Monitoring and Healing for Mesos
+Wants=mesos-master.service
+
+[Service]
+ExecStart={{ satellite_install_dir }}/satellite-master
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
