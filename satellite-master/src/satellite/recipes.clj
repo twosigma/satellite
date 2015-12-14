@@ -16,6 +16,7 @@
   (:require
    [clojure.tools.logging :refer :all]
    [riemann.streams :refer :all]
+   [riemann.folds :as folds]
    [satellite.whitelist :as whitelist]))
 
 ;; Forward declaration of on/off-host so they can be used in this namespace and
@@ -110,3 +111,35 @@
               "due to failed test:" bad-test)
         (off-host host))
       (on-host host))))
+
+(defn fold-blackhole-thresholds
+  "Compares the pair of blackhole ratio values against configured acceptance thresholds;
+  returns a single event which indicates whether the host seems to be a black hole,
+  using :state ok or critical"
+  [settings events]
+  (assoc (first events)
+         :service "task blackhole detected"
+         :state (if (and (> (-> events first :metric)
+                            (:blackhole-max-fails-per-start settings))
+                         (>= (-> events second :metric)
+                             (:blackhole-max-fails-per-finish settings)))
+                  "critical"
+                  "ok")
+         :description "Whether the host represents a black hole for tasks."
+         :metric nil
+         :tags nil))
+
+(defn fold-safe-quotient
+  "Like riemann.folds/quotient, but if the divisor is 0, returns a metric that
+  is a very low negative number, zero, or a very high positive number depending on
+  whether the dividend is negative, zero, or positive respectively.
+  Only appropriate for pairs of events."
+  [events]
+  (let [first-metric (:metric (first events))
+        last-metric (:metric (last events))]
+    (if (zero? last-metric)
+      (assoc (first events) :metric (cond (zero? first-metric) 0
+                                          (< 0 first-metric) Float/MIN_VALUE
+                                          (> 0 first-metric) Float/MAX_VALUE))
+      (folds/quotient events))))
+

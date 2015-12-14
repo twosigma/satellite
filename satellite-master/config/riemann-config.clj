@@ -20,6 +20,32 @@
 ;; expire expired events every 5 seconds
 (periodically-expire 5)
 
+(def blackhole-ratios-stream
+  (by :host
+      (project [(service  "tasks failed per started")
+                (service  "tasks failed per finished")]
+               (smap (partial fold-blackhole-thresholds satellite.core/settings)
+                     (stable (* 2 (:blackhole-check-seconds satellite.core/settings)) :state
+                             (where (state "critical")
+                                    (fn [event]
+                                      (warn "Removing host because it is failing too many tasks.")
+                                      (off-host (:host event)))))))))
+
+
+(def task-totals-ddt-stream
+  (by :host
+      (project [(service  "mesos/slave/total-tasks-failed")
+                (service  "mesos/slave/total-tasks-started")]
+               (smap fold-safe-quotient
+                     (with :service "tasks failed per started"
+                           blackhole-ratios-stream)))
+
+      (project [(service  "mesos/slave/total-tasks-failed")
+                (service "mesos/slave/total-tasks-finished")]
+               (smap fold-safe-quotient
+                     (with :service "tasks failed per finished"
+                           blackhole-ratios-stream)))))
+
 (streams
  indx
  (where (service #"satellite.*")
@@ -45,6 +71,12 @@
                 (else
                  (coalesce 60
                            ensure-all-tests-pass))))
+
+ ;; check task run totals to detect task host black holes
+ (where (service #"mesos/slave/total-tasks-.*")
+        (by [:host :service]
+            (ddt (:blackhole-check-seconds satellite.core/settings)
+                 task-totals-ddt-stream)))
 
  ;; if less than 70% of hosts registered with mesos are
  ;; on the whitelist, alert with an email

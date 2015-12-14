@@ -45,6 +45,9 @@
 
 (def settings-schema
   {;; the Riemann config file that will process events
+   :blackhole-max-fails-per-start s/Num
+   :blackhole-max-fails-per-finish s/Num
+   :blackhole-check-seconds s/Int
    :riemann-config (s/pred file-exists? 'file-exists?)
    :riemann-tcp-server-options riemann-tcp-server-schema
    :sleep-time s/Int
@@ -91,6 +94,10 @@
    :curator-retry-policy {:base-sleep-time-ms 100
                           :max-sleep-time-ms 120000
                           :max-retries 10}
+   ;; thresholds for automatic black hole host disabling
+   :blackhole-max-fails-per-start 0.75
+   :blackhole-max-fails-per-finish 3.0
+   :blackhole-check-seconds 300
    ;; the path on disk to the Mesos whitelist
    :local-whitelist-path "whitelist"
    ;; predicate used to validate hosts that are added to the whitelist
@@ -219,7 +226,8 @@
         (load-file config))
     (log/info (str "Using default settings" settings)))
   (s/validate settings-schema settings)
-  ((graph/eager-compile (app (map->graph settings))) {}))
+  ((graph/eager-compile (app (map->graph settings))) {})
+  )
 
 (comment
   (init-logging)
