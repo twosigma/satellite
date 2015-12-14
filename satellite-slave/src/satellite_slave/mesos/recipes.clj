@@ -16,7 +16,12 @@
   (:require [clj-time.core :as t]
             [clojure.tools.logging :as log]
             [satellite-slave.mesos.cache :as cache]
+            [satellite-slave.mesos.monitoring :as mon]
             [satellite-slave.util :refer [every]]))
+
+(defn get-slave-host
+  [config]
+  (get config :slave (.getCanonicalHostName (java.net.InetAddress/getLocalHost))))
 
 (defn cache-state
   "Return a map which could be used as input for core/run-test.
@@ -28,8 +33,7 @@
    Output:
        Return a map which could be used as input for core/run-test."
   [threshold period config]
-  (let [local-host (.getCanonicalHostName (java.net.InetAddress/getLocalHost))
-        slave-host (get config :slave local-host)]
+  (let [slave-host (get-slave-host config)]
     {:command ["echo" slave-host]
      :schedule (every period)
      :output (fn [& params]
@@ -45,3 +49,51 @@
                   :service "cache state"
                   :state (if (> failures threshold) "critical" "ok")
                   :metric failures}))}))
+
+(defn total-tasks-failed
+  [period config]
+  {:command ["echo" "mesos tasks failed"]
+   :schedule (every period)
+   :output (fn [& params]
+             (let [v (-> config
+                         get-slave-host
+                         mon/parse-observability-metrics
+                         mon/num-tasks-failed)]
+               [{:service "total-tasks-failed"
+                 :state "ok"
+                 :metric v
+                 :ttl (* 5 (.getSeconds period))
+                 :description "Number of Mesos tasks failed"}
+                ]))})
+
+(defn total-tasks-finished
+  [period config]
+  {:command ["echo" "mesos tasks finished"]
+   :schedule (every period)
+   :output (fn [& params]
+             (let [v (-> config
+                         get-slave-host
+                         mon/parse-observability-metrics
+                         mon/num-tasks-finished)]
+               [{:service "total-tasks-finished"
+                 :state "ok"
+                 :metric v
+                 :ttl (* 5 (.getSeconds period))
+                 :description "Number of Mesos tasks finished"}
+                ]))})
+
+(defn total-tasks-started
+  [period config]
+  {:command ["echo" "mesos tasks started"]
+   :schedule (every period)
+   :output (fn [& params]
+             (let [v (-> config
+                         get-slave-host
+                         mon/parse-observability-metrics
+                         mon/num-tasks-started)]
+               [{:service "total-tasks-started"
+                 :state "ok"
+                 :metric v
+                 :ttl (* 5 (.getSeconds period))
+                 :description "Number of Mesos tasks started"}
+                ]))})
