@@ -28,4 +28,5 @@
   :plugins [[lein-cljfmt "0.1.10"]]
   :aot [satellite-slave.core]
   :main satellite-slave.core
+  :resource-paths ["resources"]
   :aliases {"release-jar" ["do" "clean," "uberjar"]})
