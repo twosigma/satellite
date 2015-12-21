@@ -24,9 +24,11 @@
                  [org.slf4j/slf4j-log4j12 "1.7.7"
                   :exclusions [log4j]]
                  [riemann-clojure-client "0.3.1"]
+                 [com.github.ContainerSolutions/minimesos "0.5.0"]
                  [clj-http "1.1.0"]]
   :plugins [[lein-cljfmt "0.1.10"]]
   :aot [satellite-slave.core]
   :main satellite-slave.core
   :resource-paths ["resources"]
+  :repositories {"jitpack" "https://jitpack.io"}
   :aliases {"release-jar" ["do" "clean," "uberjar"]})
