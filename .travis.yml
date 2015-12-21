@@ -13,9 +13,14 @@
 # limitations under the License.
 
 language: clojure
+services:
+  - docker
 env:
   matrix:
-    - TEST_DIR=satellite-master
+#    - TEST_DIR=satellite-master
     - TEST_DIR=satellite-slave
+before_install:
+  - ./minimesos up
 install:
   - cd $TEST_DIR && lein deps
+
