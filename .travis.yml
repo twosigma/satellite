@@ -21,6 +21,7 @@ env:
     - TEST_DIR=satellite-slave
 before_install:
   - ./minimesos up
+  - curl http://172.17.0.3:5050
 install:
   - cd $TEST_DIR && lein deps
 
