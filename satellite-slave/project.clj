@@ -24,7 +24,10 @@
                  [org.slf4j/slf4j-log4j12 "1.7.7"
                   :exclusions [log4j]]
                  [riemann-clojure-client "0.3.1"]
-                 [com.github.ContainerSolutions/minimesos "0.5.0"]
+                 [com.github.ContainerSolutions/minimesos "0.5.0"
+                  :exclusions [org.slf4j/log4j-over-slf4j
+                               ch.qos.logback/logback-core
+                               ch.qos.logback/logback-classic]
                  [clj-http "1.1.0"]]
   :plugins [[lein-cljfmt "0.1.10"]]
   :aot [satellite-slave.core]
