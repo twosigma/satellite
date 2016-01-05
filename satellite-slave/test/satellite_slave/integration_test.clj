@@ -1,16 +1,34 @@
 (ns satellite-slave.integration-test
   (use clojure.test)
   (:import (com.containersol.minimesos MesosCluster)
+           (com.github.dockerjava.api DockerClient)
            (com.containersol.minimesos.mesos ClusterArchitecture
-                                             ClusterArchitecture$Builder)
+                                             ClusterArchitecture$Builder
+                                             MesosMaster
+                                             ClusterContainers$Filter)
+           (com.github.dockerjava.api DockerClient)
+           (com.github.dockerjava.core DockerClientConfig
+                                       DockerClientBuilder)
+           (java.util.function Function)
             ))
 
+(defn docker-client
+  []
+  (-> (DockerClientConfig/createDefaultConfigBuilder)
+      (.withUri "https://192.168.99.100:2376")
+      (.withDockerCertPath "/Users/andalucien/.docker/machine/machines/minimesos")
+      .build
+      DockerClientBuilder/getInstance
+      .build
+      )
+  )
 
 (defn cluster-architecture
   []
-  (-> (ClusterArchitecture$Builder.)
+  (-> (docker-client)
+      ClusterArchitecture$Builder.
       .withZooKeeper
-      .withMaster
+      (.withMaster (foo))
       (.withSlave "ports(*):[9200-9200,9300-9300]")
       .build)
   )
@@ -20,6 +38,18 @@
   (MesosCluster. (cluster-architecture))
   )
 
+(defn mesos-master
+  [docker, zk]
+  (proxy [MesosMaster] [docker, zk])
+  )
+
+(defn foo
+  []
+  (reify Function
+    (apply [this zk]
+      (mesos-master (docker-client) zk)
+      ))
+  )
 
 ;; (def cluster nil)
 
