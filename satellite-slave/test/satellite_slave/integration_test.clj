@@ -10,12 +10,13 @@
            (com.github.dockerjava.core DockerClientConfig
                                        DockerClientBuilder)
            (java.util.function Function)
+           (satellite_slave my_mesos_master)
             ))
 
 (defn docker-client
   []
   (-> (DockerClientConfig/createDefaultConfigBuilder)
-      (.withUri "https://192.168.99.100:2376")
+      (.withUri "https://192.168.99.101:2376")
       (.withDockerCertPath "/Users/andalucien/.docker/machine/machines/minimesos")
       .build
       DockerClientBuilder/getInstance
@@ -23,12 +24,39 @@
       )
   )
 
+(defn mesos-master
+  [docker, zk]
+  (new satellite_slave.my_mesos_master nil nil)
+
+  (proxy [MesosMaster] [docker, zk]
+    (dockerCommand []
+      (prn this)
+      (.createContainerCmd (docker-client) "foobar")
+      ;; (.createContainerCmd (docker-client)
+      ;;                      MESOS_MASTER_IMAGE + ":" + MESOS_IMAGE_TAG)
+      ;; .withName("minimesos-master-" + getClusterId() + "-" + getRandomId())
+      ;; .withExposedPorts(new ExposedPort(MESOS_MASTER_PORT))
+      ;; .withEnv(createMesosLocalEnvironment()
+
+      )
+    )
+  )
+
+(defn master-creator-function
+  []
+  (reify Function
+    (apply [this zk]
+      (prn "HEY YOOOOOO!!!!" zk)
+      (mesos-master (docker-client) zk)
+      ))
+  )
+
 (defn cluster-architecture
   []
   (-> (docker-client)
       ClusterArchitecture$Builder.
       .withZooKeeper
-      (.withMaster (foo))
+      (.withMaster (master-creator-function))
       (.withSlave "ports(*):[9200-9200,9300-9300]")
       .build)
   )
@@ -38,18 +66,7 @@
   (MesosCluster. (cluster-architecture))
   )
 
-(defn mesos-master
-  [docker, zk]
-  (proxy [MesosMaster] [docker, zk])
-  )
 
-(defn foo
-  []
-  (reify Function
-    (apply [this zk]
-      (mesos-master (docker-client) zk)
-      ))
-  )
 
 ;; (def cluster nil)
 
