@@ -209,15 +209,24 @@
                                   "'.'yyyy-MM-dd")
                             :level :info}))
 
+
+
+
+
+
+(defn load-config
+  [config]
+  (log/info (str "Reading config from file: " config))
+  (load-file config))
+
 (defn -main
-  [& [config args]]
+  [& args]
   (init-logging)
   (log/info "Starting Satellite")
-  (if (and config
-           (.exists (java.io.File. config)))
-    (do (log/info (str "Reading config from file: " config))
-        (def settings (merge settings (load-file config))))
-    (log/info (str "Using default settings" settings)))
+  (if (empty? args)
+    (log/info (str "Using default settings" settings))
+    (def settings (apply merge settings (map load-config args))))
+
   (s/validate settings-schema settings)
   ((graph/eager-compile (app (map->graph settings))) {}))
 
