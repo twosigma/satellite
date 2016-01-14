@@ -216,7 +216,7 @@
   (if (and config
            (.exists (java.io.File. config)))
     (do (log/info (str "Reading config from file: " config))
-        (load-file config))
+        (def settings (merge settings (load-file config))))
     (log/info (str "Using default settings" settings)))
   (s/validate settings-schema settings)
   ((graph/eager-compile (app (map->graph settings))) {}))
