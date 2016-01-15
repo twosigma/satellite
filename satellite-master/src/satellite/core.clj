@@ -14,6 +14,7 @@
 
 (ns satellite.core
   (:require [cemerick.url :as url]
+            [cheshire.core :as cheshire]
             [clj-http.client :as client]
             [clj-logging-config.log4j :as log4j-conf]
             [clojurewerkz.welle.core :as wc]
@@ -210,9 +211,14 @@
                             :level :info}))
 
 (defn load-config
-  [config]
-  (log/info (str "Reading config from file: " config))
-  (load-file config))
+  [file]
+  (log/info (str "Reading config from file: " file))
+  (cond (.endsWith file ".clj")
+        (load-file file)
+        (.endsWith file ".json")
+        (cheshire/parse-stream (clojure.java.io/reader file) true)
+        :else
+        (throw (java.lang.Exception. (str "Unsupported config suffix " file)))))
 
 (defn -main
   [& args]
