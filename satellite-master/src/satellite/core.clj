@@ -98,6 +98,13 @@
    :whitelist-hostname-pred (fn [hostname]
                               (identity hostname))})
 
+(defn enrich-settings
+  "enrich the data types of settings values"
+  [raw-settings]
+  (assoc raw-settings :mesos-master-url
+         (when (:mesos-master-url raw-settings)
+           (-> raw-settings :mesos-master-url url/url))))
+
 (defn map->graph
   [m]
   (plumbing.core/map-vals (fn [x] (fnk [] x)) m))
@@ -231,8 +238,9 @@
   (log/info "Starting Satellite")
   (if (empty? args)
     (log/info (str "Using default settings" settings))
-    (def settings (apply merge settings (map load-config args))))
-
+    (def settings (->> (map load-config args)
+                       (apply merge settings)
+                       enrich-settings)))
   (s/validate settings-schema settings)
   ((graph/eager-compile (app (map->graph settings))) {}))
 
