@@ -50,7 +50,7 @@
    :riemann-tcp-server-options riemann-tcp-server-schema
    :sleep-time s/Int
    :mesos-master-url cemerick.url.URL
-   :riak (s/maybe {:endpoint (s/pred clojure.java.io/as-url)
+   :riak (s/maybe {:endpoint (s/pred url/url)
                    :bucket s/Str})
    :service-host s/Str
    :service-port s/Int
