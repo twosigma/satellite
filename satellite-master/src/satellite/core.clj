@@ -49,7 +49,7 @@
    :riemann-config (s/pred file-exists? 'file-exists?)
    :riemann-tcp-server-options riemann-tcp-server-schema
    :sleep-time s/Int
-   :mesos-master-url cemerick.url.URL
+   :mesos-master-url (s/pred url/url)
    :riak (s/maybe {:endpoint (s/pred url/url)
                    :bucket s/Str})
    :service-host s/Str
