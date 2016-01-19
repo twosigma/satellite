@@ -13,8 +13,10 @@
 ;; limitations under the License.
 
 (ns satellite-slave.config
-  (:require [clj-time.periodic :refer [periodic-seq]]
+  (:require [cheshire.core :as cheshire]
+            [clj-time.periodic :refer [periodic-seq]]
             [clj-time.core :as t]
+            [clojure.tools.logging :as log]
             [satellite-slave.recipes]
             [satellite-slave.mesos.recipes]
             [satellite-slave.util :refer [every]]))
@@ -77,7 +79,34 @@
    ;;             Satellite should have.
    :safe-env true})
 
-(defn include
+
+
+
+(defn load
+  [file]
+  (log/info (str "Reading config from file: " file))
+  (cond (.endsWith file ".clj")
+        (binding [*ns* (find-ns 'satellite-slave.config)]
+          (load-file file))
+        (.endsWith file ".json")
+        (cheshire/parse-stream (clojure.java.io/reader file) true)
+        :else
+        (throw (java.lang.Exception. (str "Unsupported config suffix " file))))
+  )
+
+(defn enrich
   [config]
-  (binding [*ns* (find-ns 'satellite-slave.config)]
-    (load-file config)))
+  config
+  )
+
+(defn incorporate
+  [orig c]
+  (merge orig c)
+  )
+
+(defn combine
+  [configs]
+  (->> (map load configs)
+       (map enrich)
+       (reduce incorporate settings))
+  )

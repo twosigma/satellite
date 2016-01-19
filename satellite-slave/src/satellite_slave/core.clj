@@ -143,14 +143,15 @@
                             :level :info}))
 
 (defn -main
-  [& [config args]]
+  [& args]
   (init-logging)
   (log/info "Starting Satellite-Slave")
-  (if (and config
-           (.exists (java.io.File. config)))
-    (do (log/info (str "Reading config from file: " config))
-        (config/include config))
-    (log/info (str "Using default settings.")))
+  (let [configs (filter #(not (.startsWith % "--")) args)]
+    (if (empty? configs)
+      (log/info (str "Using default settings"))
+      (def settings (config/combine configs)))
+    )
+
   (let [finish-chan (async/chan 1)
         dry-run (when args (.contains args "--dry-run"))]
     (app config/settings dry-run finish-chan)))
