@@ -22,8 +22,17 @@ Make sure local-whitelist-path is pointing to your Mesos master
 whitelist. Default is /etc/mesos/whitelist.
 
 Update riemann-tcp-server-options to the server's name or IP. localhost
-is the default setting but that will not allow other servers to connect 
+is the default setting but that will not allow other servers to connect
 to the leader via Riemann.
+
+Satellite-master accepts any number of config files, specified as command line
+parameters.  Settings from the config files will be combined into a single runtime
+configuration, which is logged when Satellite starts up.  If more than one config file
+contains a value for the same config parameter, the value in rightmost file (by
+position in command line invocation) wins.
+
+Config files may be in either .clj or JSON format.  See the examples in config/.
+
 
 ## Running
 
