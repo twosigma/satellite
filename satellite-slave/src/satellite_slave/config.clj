@@ -47,28 +47,31 @@
    ;;
    ;;             Each of these event maps will be sent to each
    ;;             satellite-master specified in :satellites.
-   :comets [{:command "echo Hello"
-             :schedule (every (-> 3 t/seconds))
-             :timeout 30
-             :output (fn [{:keys [out exit err]}]
-                       [{:ttl 30
-                         :service "Hello service"
-                         :state "ok"}])}
-            {:command ["ls" "-l"]
-             :schedule (every (-> 10 t/seconds))
-             :timeout 5
-             :output (fn [{:keys [out exit err]}]
-                       [{:ttl 30
-                         :service "ls -l"
-                         :state (if (zero? exit) "ok" "critical")}])}
-            {:command ["ls" "-l"]
-             :schedule (every (-> 17 t/seconds))
-             :output (fn [{:keys [out exit err]}]
-                       [{:ttl 20
-                         :service "yellow pig increment"
-                         :state "ok"
-                         :metric (+ exit 17)
-                         :tags ["yellow" "pig"]}])}]
+   ;;
+   ;; Example:
+   ;; :comets [{:command "echo Hello"
+   ;;           :schedule (every (-> 3 t/seconds))
+   ;;           :timeout 30
+   ;;           :output (fn [{:keys [out exit err]}]
+   ;;                     [{:ttl 30
+   ;;                       :service "Hello service"
+   ;;                       :state "ok"}])}
+   ;;          {:command ["ls" "-l"]
+   ;;           :schedule (every (-> 10 t/seconds))
+   ;;           :timeout 5
+   ;;           :output (fn [{:keys [out exit err]}]
+   ;;                     [{:ttl 30
+   ;;                       :service "ls -l"
+   ;;                       :state (if (zero? exit) "ok" "critical")}])}
+   ;;          {:command ["ls" "-l"]
+   ;;           :schedule (every (-> 17 t/seconds))
+   ;;           :output (fn [{:keys [out exit err]}]
+   ;;                     [{:ttl 20
+   ;;                       :service "yellow pig increment"
+   ;;                       :state "ok"
+   ;;                       :metric (+ exit 17)
+   ;;                       :tags ["yellow" "pig"]}])}]
+   :comets []
    ;; :safe-env : bool | {String String} , whether you want to clear the
    ;;             environment variables or wish to specify what environment
    ;;             Satellite should have.
