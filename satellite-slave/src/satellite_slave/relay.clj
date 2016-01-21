@@ -159,3 +159,19 @@
      (catch Exception e
        {:error e}))))
 
+
+(defn get-observability-metrics
+  "Retrieve the observability metrics
+  http://mesos.apache.org/documentation/latest/monitoring/"
+  ([]
+   (get-observability-metrics (.getCanonicalHostName (java.net.InetAddress/getLocalHost))))
+  ([host]
+   (get-observability-metrics ^String host "http"))
+  ([^String host ^String scheme]
+  (try
+    (http/get (format "%s://%s:5051/metrics/snapshot" scheme host)
+              {:socket-timeout (* 20 1000) ;; in milliseconds
+               :conn-timeout (* 20 1000)}) ;; in milliseconds
+    (catch Exception e
+      {:error e}))))
+

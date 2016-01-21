@@ -19,7 +19,8 @@
             [clojure.java.shell :as sh]
             [clojure.test]
             [clojure.tools.logging :as log]
-            [satellite-slave.config :as config])
+            [satellite-slave.config :as config]
+            [satellite-slave.mesos.monitoring :as monitor])
   (:use riemann.client)
   (:import java.util.concurrent.TimeUnit)
   (:gen-class))

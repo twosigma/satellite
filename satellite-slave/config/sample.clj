@@ -26,6 +26,11 @@
                                                      (-> 60 t/seconds))
             (satellite-slave.recipes/num-uninterruptable-processes 10 (-> 60 t/seconds))
             (satellite-slave.recipes/load-average 30 (-> 60 t/seconds))
+
+            (satellite-slave.mesos.recipes/total-tasks-failed (-> 60 t/seconds) settings)
+            (satellite-slave.mesos.recipes/total-tasks-finished (-> 60 t/seconds) settings)
+            (satellite-slave.mesos.recipes/total-tasks-started (-> 60 t/seconds) settings)
+
             {:command ["echo" "17"]
              :schedule (every (-> 60 t/seconds))
              :output (fn [{:keys [out err exit]}]

@@ -16,6 +16,7 @@
   (:require
    [clojure.tools.logging :refer :all]
    [riemann.streams :refer :all]
+   [riemann.folds :as folds]
    [satellite.whitelist :as whitelist]))
 
 ;; Forward declaration of on/off-host so they can be used in this namespace and
@@ -110,3 +111,27 @@
               "due to failed test:" bad-test)
         (off-host host))
       (on-host host))))
+
+
+(defn exceeds-threshold?
+  [{divisor :metric}  {dividend :metric} threshold]
+  (and (pos? divisor)
+       (or (zero? dividend)
+           (> (/ divisor dividend) threshold))))
+
+(defn fold-blackhole-thresholds
+  "Compares the trio of blackhole values against configured acceptance thresholds;
+  returns a single event which indicates whether the host seems to be a black hole,
+  using :state ok or critical"
+  [settings [failed started finished]]
+  (assoc failed
+         :service "task blackhole detected"
+         :state (if (and (exceeds-threshold? failed started
+                                             (:blackhole-fails-to-starts-threshold settings))
+                         (exceeds-threshold? failed finished
+                                             (:blackhole-fails-to-finishes-threshold settings)))
+                  "critical" "ok")
+         :description "Whether the host represents a black hole for tasks."
+         :metric nil
+         :tags nil))
+
