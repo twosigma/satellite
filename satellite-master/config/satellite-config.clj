@@ -22,11 +22,9 @@
 ;; riemann-tcp-server-options. By default, it's set to localhost and will
 ;; only allow connections from localhost.
 
-(def settings
-  (merge settings
-         {:mesos-master-url (url/url "http://localhost:5050")
-          :sleep-time 5000
-          :zookeeper "localhost:2181"
-          :local-whitelist-path "/etc/mesos/whitelist"
-          :riemann-tcp-server-options {:host "localhost" }
-          :service-host "0.0.0.0"}))
+{:mesos-master-url (url/url "http://localhost:5050")
+ :sleep-time 5000
+ :zookeeper "localhost:2181"
+ :local-whitelist-path "/etc/mesos/whitelist"
+ :riemann-tcp-server-options {:host "localhost" }
+ :service-host "0.0.0.0"}

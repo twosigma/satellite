@@ -14,6 +14,7 @@
 
 (ns satellite.core
   (:require [cemerick.url :as url]
+            [cheshire.core :as cheshire]
             [clj-http.client :as client]
             [clj-logging-config.log4j :as log4j-conf]
             [clojurewerkz.welle.core :as wc]
@@ -51,8 +52,8 @@
    :riemann-config (s/pred file-exists? 'file-exists?)
    :riemann-tcp-server-options riemann-tcp-server-schema
    :sleep-time s/Int
-   :mesos-master-url cemerick.url.URL
-   :riak (s/maybe {:endpoint (s/pred clojure.java.io/as-url)
+   :mesos-master-url (s/pred url/url)
+   :riak (s/maybe {:endpoint (s/pred url/url)
                    :bucket s/Str})
    :service-host s/Str
    :service-port s/Int
@@ -103,6 +104,13 @@
    ;; predicate used to validate hosts that are added to the whitelist
    :whitelist-hostname-pred (fn [hostname]
                               (identity hostname))})
+
+(defn enrich-settings
+  "enrich the data types of settings values"
+  [raw-settings]
+  (assoc raw-settings :mesos-master-url
+         (when (:mesos-master-url raw-settings)
+           (-> raw-settings :mesos-master-url url/url))))
 
 (defn map->graph
   [m]
@@ -216,15 +224,25 @@
                                   "'.'yyyy-MM-dd")
                             :level :info}))
 
+(defn load-config
+  [file]
+  (log/info (str "Reading config from file: " file))
+  (cond (.endsWith file ".clj")
+        (load-file file)
+        (.endsWith file ".json")
+        (cheshire/parse-stream (clojure.java.io/reader file) true)
+        :else
+        (throw (java.lang.Exception. (str "Unsupported config suffix " file)))))
+
 (defn -main
-  [& [config args]]
+  [& args]
   (init-logging)
   (log/info "Starting Satellite")
-  (if (and config
-           (.exists (java.io.File. config)))
-    (do (log/info (str "Reading config from file: " config))
-        (load-file config))
-    (log/info (str "Using default settings" settings)))
+  (if (empty? args)
+    (log/info (str "Using default settings" settings))
+    (def settings (->> (map load-config args)
+                       (apply merge settings)
+                       enrich-settings)))
   (s/validate settings-schema settings)
   ((graph/eager-compile (app (map->graph settings))) {}))
 
