@@ -80,24 +80,33 @@
    :safe-env true})
 
 
+(defn load-clj
+  [file]
+  (binding [*ns* (find-ns 'satellite-slave.config)]
+    (load-file file))
+  )
+
+(defn load-json
+  [file]
+  (let [contents (cheshire/parse-stream (clojure.java.io/reader file) true)]
+    contents
+    )
+  
+  )
 
 
-(defn load
+(defn read-config
   [file]
   (log/info (str "Reading config from file: " file))
-  (cond (.endsWith file ".clj")
-        (binding [*ns* (find-ns 'satellite-slave.config)]
-          (load-file file))
-        (.endsWith file ".json")
-        (cheshire/parse-stream (clojure.java.io/reader file) true)
-        :else
-        (throw (java.lang.Exception. (str "Unsupported config suffix " file))))
+  (cond (.endsWith file ".clj") (load-clj file)
+        (.endsWith file ".json") (load-json file)
+        :else (throw (java.lang.Exception. (str "Unsupported config suffix " file))))
   )
 
-(defn enrich
-  [config]
-  config
-  )
+;; (defn enrich
+;;   [config]
+;;   config
+;;   )
 
 (defn incorporate
   [orig c]
@@ -106,7 +115,7 @@
 
 (defn combine
   [configs]
-  (->> (map load configs)
-       (map enrich)
+  (->> (map read-config configs)
+       ;; (map enrich)
        (reduce incorporate settings))
   )
