@@ -52,7 +52,7 @@
                   :metric failures}))}))
 
 (defn total-tasks-failed
-  [period]
+  [period _]
   {:command ["echo" "mesos tasks failed"]
    :schedule (every period)
    :output (fn [& params]
@@ -68,7 +68,7 @@
                 ]))})
 
 (defn total-tasks-finished
-  [period]
+  [period _]
   {:command ["echo" "mesos tasks finished"]
    :schedule (every period)
    :output (fn [& params]
@@ -84,7 +84,7 @@
                 ]))})
 
 (defn total-tasks-started
-  [period]
+  [period _]
   {:command ["echo" "mesos tasks started"]
    :schedule (every period)
    :output (fn [& params]

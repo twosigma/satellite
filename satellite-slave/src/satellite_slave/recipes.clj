@@ -19,7 +19,7 @@
 
 
 (defn free-memory
-  [threshold period]
+  [period {:keys [threshold]}]
   {:command ["satellite-recipes" "free-memory"]
    :schedule (every period)
    :output (fn [{:keys [out err exit]}]
@@ -31,7 +31,7 @@
    :timeout 5})
 
 (defn free-swap
-  [threshold period]
+  [period {:keys [threshold]}]
   {:command ["satellite-recipes" "free-swap"]
    :schedule (every period)
    :timeout 5
@@ -43,7 +43,7 @@
                  :metric v}]))})
 
 (defn free-swap-iff-swap
-  [threshold period]
+  [period {:keys [threshold]}]
   {:command ["satellite-recipes" "swap-info"]
    :schedule (every period)
    :timeout 5
@@ -59,7 +59,7 @@
                  :metric free}]))})
 
 (defn percentage-used
-  [threshold path period]
+  [period {:keys [threshold path]}]
   {:command ["satellite-recipes" "percentage-used" path]
    :schedule (every period)
    :timeout 5
@@ -71,7 +71,7 @@
                  :metric v}]))})
 
 (defn df-returns
-  [timeout period]
+  [period {:keys [timeout]}]
   {:command "/bin/df"
    :schedule (every period)
    :timeout timeout
@@ -82,7 +82,7 @@
                :metric exit}])})
 
 (defn num-uninterruptable-processes
-  [threshold period]
+  [period {:keys [threshold]}]
   {:command ["satellite-recipes" "num-uninterruptable-processes"]
    :schedule (every period)
    :output (fn [{:keys [out err exit]}]
@@ -93,7 +93,7 @@
                  :metric v}]))})
 
 (defn load-average
-  [threshold period]
+  [period {:keys [threshold]}]
   {:command ["satellite-recipes" "load-average"]
    :schedule (every period)
    :output (fn [{:keys [out err exit]}]
@@ -104,7 +104,7 @@
                  :metric v}]))})
 
 (defn file-exists
-  [path period]
+  [period {:keys [path]}]
   :riemann {}
   {:command ["satellite-recipes" "file-exists" path]
    :schedule (every period)

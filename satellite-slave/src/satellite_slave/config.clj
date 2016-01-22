@@ -13,10 +13,12 @@
 ;; limitations under the License.
 
 (ns satellite-slave.config
-  (:require [clj-time.periodic :refer [periodic-seq]]
+  (:require [cheshire.core :as cheshire]
+            [clj-time.periodic :refer [periodic-seq]]
             [clj-time.core :as t]
             [satellite-slave.recipes]
-            [satellite-slave.util :refer [every]]))
+            [satellite-slave.util :refer [every]])
+  (:import (org.joda.time Period)))
 
 (def settings
   {;; :satellite : [riemann-tcp-client]; configure one client per
@@ -72,6 +74,16 @@
    ;;             environment variables or wish to specify what environment
    ;;             Satellite should have.
    :safe-env true})
+
+(defn build-comet
+  "Input: a simplified static data structure referring to predefined
+  comet-generating function (see example-settings.json).
+  Output: a full-fledged comet."
+  [c]
+  ((resolve (symbol (:name c)))
+   ;; https://en.wikipedia.org/wiki/ISO_8601#Durations
+   (Period/parse (str "PT" (:period c)))
+   (:params c)))
 
 (defn include
   [config]
