@@ -86,12 +86,16 @@
     (load-file file))
   )
 
+(defn enrich-comet
+  [c]
+  c
+  )
+
 (defn load-json
   [file]
   (let [contents (cheshire/parse-stream (clojure.java.io/reader file) true)]
-    contents
+    (assoc contents :comets (map enrich-comet (:comets contents)))
     )
-  
   )
 
 
