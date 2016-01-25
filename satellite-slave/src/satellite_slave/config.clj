@@ -16,7 +16,6 @@
   (:require [clj-time.periodic :refer [periodic-seq]]
             [clj-time.core :as t]
             [satellite-slave.recipes]
-            [satellite-slave.mesos.recipes]
             [satellite-slave.util :refer [every]]))
 
 (def settings

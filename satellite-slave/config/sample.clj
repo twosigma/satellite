@@ -12,6 +12,8 @@
 ;; See the License for the specific language governing permissions and
 ;; limitations under the License.
 
+(require 'satellite-slave.mesos.recipes)
+
 (def mesos-work-dir "/tmp/mesos")
 
 (def settings
