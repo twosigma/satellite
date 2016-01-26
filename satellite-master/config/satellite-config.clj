@@ -24,9 +24,7 @@
 
 (def settings
   (merge settings
-         {:mesos-master-url (url/url "http://localhost:5050")
-          :sleep-time 5000
-          :zookeeper "localhost:2181"
-          :local-whitelist-path "/etc/mesos/whitelist"
-          :riemann-tcp-server-options {:host "localhost" }
-          :service-host "0.0.0.0"}))
+         (-> "config/satellite-settings.json"
+             clojure.java.io/reader
+             (cheshire/parse-stream true)
+             enrich-settings)))

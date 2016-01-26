@@ -14,6 +14,7 @@
 
 (ns satellite.core
   (:require [cemerick.url :as url]
+            [cheshire.core :as cheshire]
             [clj-http.client :as client]
             [clj-logging-config.log4j :as log4j-conf]
             [clojurewerkz.welle.core :as wc]
@@ -215,6 +216,11 @@
                                   "log/satellite.log"
                                   "'.'yyyy-MM-dd")
                             :level :info}))
+
+(defn enrich-settings
+  "enrich the data types of settings values"
+  [raw-settings]
+  (update-in raw-settings [:mesos-master-url] url/url))
 
 (defn -main
   [& [config args]]
