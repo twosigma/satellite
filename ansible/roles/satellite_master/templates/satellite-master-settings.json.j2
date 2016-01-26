@@ -1,0 +1,14 @@
+{
+  "mesos-master-url": "http://{{ ansible_ssh_host }}:5050",
+  "sleep-time": 5000,
+  "zookeeper": "{{ ansible_ssh_host }}:2181",
+  "local-whitelist-path": "/etc/mesos/whitelist",
+  "riemann-config": "{{ satellite_install_dir }}/riemann-config.clj",
+  "riemann-tcp-server-options": {
+    "host": "0.0.0.0"
+  },
+  "service-host": "0.0.0.0",
+  "blackhole-fails-to-starts-threshold": 0.75,
+  "blackhole-fails-to-finishes-threshold": 3.0,
+  "blackhole-check-seconds": 10
+}

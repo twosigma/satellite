@@ -12,11 +12,14 @@
 ;; See the License for the specific language governing permissions and
 ;; limitations under the License.
 
-(def mesos-work-dir "/tmp/mesos")
+(def custom-comets [])
+
+(defn enrich-settings
+  [s]
+  (assoc s :comets (into custom-comets (map build-comet (:comets s)))))
 
 (def settings
-  {:satellites [{% for master in groups['satellite_masters'] %}
-                {:host "{{ hostvars[master]['ansible_ssh_host']}}"}
-                {% endfor %}]
-   :service "mesos/slave/"
-   :comets [(satellite-slave.recipes/free-memory 50 (-> 60 t/seconds))]})
+  (-> "{{ satellite_install_dir }}/satellite-slave-settings.json"
+      clojure.java.io/reader
+      (cheshire/parse-stream true)
+      enrich-settings))

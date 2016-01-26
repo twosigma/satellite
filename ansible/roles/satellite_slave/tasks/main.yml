@@ -34,8 +34,13 @@
   tags:
     - slave
 
-- name: place satellite slave config
+- name: place satellite slave clojure config file
   template: src={{ slave_config_template }} dest={{ satellite_install_dir }}/satellite-slave-config.clj
+  tags:
+    - slave
+
+- name: place satellite slave settings data
+  template: src={{ slave_settings_template }} dest={{ satellite_install_dir }}/satellite-slave-settings.json
   tags:
     - slave
 
