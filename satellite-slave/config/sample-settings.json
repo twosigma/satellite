@@ -4,6 +4,7 @@
     {"host": "satellite.master.2.example.com"}
   ],
   "service": "mesos/slave/",
+  "slave-host": "slave-host-fqdn",
   "comets": [
     {"name": "satellite-slave.recipes/free-memory",
      "period": "60s",

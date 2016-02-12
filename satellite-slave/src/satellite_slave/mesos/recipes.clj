@@ -18,11 +18,7 @@
             [clojure.tools.logging :as log]
             [satellite-slave.mesos.cache :as cache]
             [satellite-slave.mesos.monitoring :as mon]
-            [satellite-slave.util :refer [every]]))
-
-(defn get-slave-host
-  [config]
-  (get config :slave (.getCanonicalHostName (java.net.InetAddress/getLocalHost))))
+            [satellite-slave.util :refer [every get-slave-host]]))
 
 (defn cache-state
   "Return a map which could be used as input for core/run-test.

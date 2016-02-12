@@ -26,6 +26,7 @@
    ;;              https://github.com/aphyr/riemann-clojure-client/blob/0.3.1/src/riemann/client.clj#L121
    ;;              for parameters
    :satellites [{:host "localhost"}]
+   ;; :slave-host : Hostname used to subscribe the slave.
    ;; :service : String, to prefix the :service key in all Riemann events
    :service "/my/yellow/pig/service"
    ;; :comets : [comet], where a comet has the following schema:
