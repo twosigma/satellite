@@ -1,0 +1,13 @@
+{
+  "mesos-master-url": "http://localhost:5050",
+  "sleep-time": 5678,
+  "zookeeper": "localhost:2181",
+  "local-whitelist-path": "/etc/mesos/whitelist",
+  "riemann-tcp-server-options": {
+    "host": "localhost"
+  },
+  "service-host": "0.0.0.0",
+  "blackhole-fails-to-starts-threshold": 0.75,
+  "blackhole-fails-to-finishes-threshold": 3.0,
+  "blackhole-check-seconds": 10
+}

@@ -14,11 +14,16 @@ Run `lein release-jar` to compile a jar in `./target`. Copy a copy of the
 
 ## Configuration
 
-There is a sample config included in `/config/sample.clj` and thorough
-documentation of the config in `/src/satellite_slave/config.clj`.
+There is a sample master config file included in `/config/sample.clj`.  Since the master config file is a clojure program, you can run any sort of initialization code that you want here.  However, at minimum, you should define the "settings" var.
 
-All you should have to do is copy the sample file and list your Satellite 
-masters.
+To make it easier to edit simple values, the sample master config loads data from a static json file in the same directory, `config/sample-settings.json`.  You can start off by just editing the values in this file.  Later on, if you need to write your own comets,
+you can add those directly to the master config.clj file.
+
+Thorough documentation of the final structure of the settings can be found at
+`/src/satellite_slave/config.clj`.
+
+To get started, all you should have to do is copy the sample files and list your
+Satellite masters.
 
 ## Running
 

@@ -19,6 +19,7 @@
     master_source_dir: ../satellite-master
     master_jar: "{{ master_source_dir }}/target/satellite-master-0.2.0-SNAPSHOT-standalone.jar"
     master_config_template: satellite-master-config.clj.j2
+    master_settings_template: satellite-master-settings.json.j2
     riemann_config_file: "{{ master_source_dir }}/config/riemann-config.clj"
   roles:
     - satellite_master
@@ -30,6 +31,7 @@
     slave_source_dir: ../satellite-slave
     slave_jar: "{{ slave_source_dir }}/target/satellite-slave-0.2.0-SNAPSHOT-standalone.jar"
     slave_config_template: satellite-slave-config.clj.j2
+    slave_settings_template: satellite-slave-settings.json.j2
     recipes_script: "{{ slave_source_dir }}/bin/satellite-recipes"
   roles:
     - satellite_slave

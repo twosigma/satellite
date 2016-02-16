@@ -1,0 +1,39 @@
+{
+  "satellites": [
+    {"host": "satellite.master.1.example.com"},
+    {"host": "satellite.master.2.example.com"}
+  ],
+  "service": "mesos/slave/",
+  "comets": [
+    {"name": "satellite-slave.recipes/free-memory",
+     "period": "60s",
+     "params": {"threshold": 50}},
+    {"name": "satellite-slave.recipes/free-swap",
+     "period": "60s",
+     "params": {"threshold": 50}},
+    {"name": "satellite-slave.recipes/percentage-used",
+     "period": "60s",
+     "params": {"threshold": 90, "path": "/tmp"}},
+    {"name": "satellite-slave.recipes/percentage-used",
+     "period": "60s",
+     "params": {"threshold": 90, "path": "/var"}},
+    {"name": "satellite-slave.recipes/percentage-used",
+     "period": "60s",
+     "params": {"threshold": 90, "path": "/tmp/mesos"}},
+    {"name": "satellite-slave.recipes/num-uninterruptable-processes",
+     "period": "60s",
+     "params": {"threshold": 10}},
+    {"name": "satellite-slave.recipes/load-average",
+     "period": "60s",
+     "params": {"threshold": 30}},
+    {"name": "satellite-slave.mesos.recipes/total-tasks-failed",
+     "period": "60s",
+     "params": {}},
+    {"name": "satellite-slave.mesos.recipes/total-tasks-finished",
+     "period": "60s",
+     "params": {}},
+    {"name": "satellite-slave.mesos.recipes/total-tasks-started",
+     "period": "60s",
+     "params": {}}
+  ]
+}

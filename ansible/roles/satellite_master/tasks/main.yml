@@ -34,8 +34,13 @@
   tags:
     - master
 
-- name: place satellite master config
+- name: place satellite master clojure config file
   template: src={{ master_config_template }} dest={{ satellite_install_dir }}/satellite-master-config.clj
+  tags:
+    - master
+
+- name: place satellite master settings data
+  template: src={{ master_settings_template }} dest={{ satellite_install_dir }}/satellite-master-settings.json
   tags:
     - master
 

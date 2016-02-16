@@ -14,6 +14,7 @@
 
 (ns satellite.core
   (:require [cemerick.url :as url]
+            [cheshire.core :as cheshire]
             [clj-http.client :as client]
             [clj-logging-config.log4j :as log4j-conf]
             [clojurewerkz.welle.core :as wc]
@@ -52,7 +53,7 @@
    :riemann-tcp-server-options riemann-tcp-server-schema
    :sleep-time s/Int
    :mesos-master-url cemerick.url.URL
-   :riak (s/maybe {:endpoint (s/pred clojure.java.io/as-url)
+   :riak (s/maybe {:endpoint (s/pred url/url)
                    :bucket s/Str})
    :service-host s/Str
    :service-port s/Int
@@ -215,6 +216,11 @@
                                   "log/satellite.log"
                                   "'.'yyyy-MM-dd")
                             :level :info}))
+
+(defn enrich-settings
+  "enrich the data types of settings values"
+  [raw-settings]
+  (update-in raw-settings [:mesos-master-url] url/url))
 
 (defn -main
   [& [config args]]

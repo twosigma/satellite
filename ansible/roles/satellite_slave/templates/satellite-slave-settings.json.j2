@@ -1,0 +1,11 @@
+{
+  "satellites": [{% for master in groups['satellite_masters'] %}
+    {"host": "{{ hostvars[master]['ansible_ssh_host'] }}"}{% if not loop.last %},{% endif %}
+  {% endfor %}],
+  "service": "mesos/slave/",
+  "comets": [
+    {"name": "satellite-slave.recipes/free-memory",
+     "params": [50],
+     "every": 3}
+  ]
+}

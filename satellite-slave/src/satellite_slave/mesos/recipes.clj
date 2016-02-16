@@ -14,6 +14,7 @@
 
 (ns satellite-slave.mesos.recipes
   (:require [clj-time.core :as t]
+            [satellite-slave.config :refer [settings]]
             [clojure.tools.logging :as log]
             [satellite-slave.mesos.cache :as cache]
             [satellite-slave.mesos.monitoring :as mon]
@@ -51,11 +52,11 @@
                   :metric failures}))}))
 
 (defn total-tasks-failed
-  [period config]
+  [period _]
   {:command ["echo" "mesos tasks failed"]
    :schedule (every period)
    :output (fn [& params]
-             (let [v (-> config
+             (let [v (-> settings
                          get-slave-host
                          mon/parse-observability-metrics
                          mon/num-tasks-failed)]
@@ -67,11 +68,11 @@
                 ]))})
 
 (defn total-tasks-finished
-  [period config]
+  [period _]
   {:command ["echo" "mesos tasks finished"]
    :schedule (every period)
    :output (fn [& params]
-             (let [v (-> config
+             (let [v (-> settings
                          get-slave-host
                          mon/parse-observability-metrics
                          mon/num-tasks-finished)]
@@ -83,11 +84,11 @@
                 ]))})
 
 (defn total-tasks-started
-  [period config]
+  [period _]
   {:command ["echo" "mesos tasks started"]
    :schedule (every period)
    :output (fn [& params]
-             (let [v (-> config
+             (let [v (-> settings
                          get-slave-host
                          mon/parse-observability-metrics
                          mon/num-tasks-started)]
