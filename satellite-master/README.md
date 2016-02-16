@@ -14,6 +14,23 @@ Run `lein release-jar` to compile a jar in `./target`. Copy a copy of the
 
 ## Configuration
 
+There are actually three files that can be used to configure the behavior of satellite-master.  Samples of all three live in the config/ folder in this repo.
+
+### [satellite-config.clj](config/satellite-config.clj)
+
+This is a clojure file that will be dynamically loaded and executed by Satellite
+when it starts up. You can put anything here, but you should make sure to at
+least define the "settings" var. Among other things, these top-level settings
+tell Satellite where to look for the riemann configuration.
+
+The provided sample implementation simply loads settings from a static .json
+file in the same directory (see below).
+
+### [satellite-settings.json](config/satellite-settings.json)
+
+As a starting point, we've provided these settings in a static file, to allow
+the alteration of simple values without needing to edit clojure code.
+
 It is recommended to replace all occurances of localhost with the
 server's host name that the Satellite master is installed on assuming
 you'd like to connect to things like the API outside of localhost.
@@ -22,9 +39,15 @@ Make sure local-whitelist-path is pointing to your Mesos master
 whitelist. Default is /etc/mesos/whitelist.
 
 Update riemann-tcp-server-options to the server's name or IP. localhost
-is the default setting but that will not allow other servers to connect 
+is the default setting but that will not allow other servers to connect
 to the leader via Riemann.
 
+### [riemann-config.clj](config/riemann-config.clj)
+
+This houses the code that processes the incoming events from other Satellite
+processes.   Like any other Riemann configuration, you can modify or rewrite these
+event handlers to suit the needs of your applications and your Mesos cluster.
+  
 ## Running
 
 Run each jar using `java` as usual, with the single argument being a path to
