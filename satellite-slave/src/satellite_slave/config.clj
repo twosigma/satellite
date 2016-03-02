@@ -16,9 +16,27 @@
   (:require [cheshire.core :as cheshire]
             [clj-time.periodic :refer [periodic-seq]]
             [clj-time.core :as t]
+            [schema.core :as s]
             [satellite-slave.recipes]
             [satellite-slave.util :refer [every]])
   (:import (org.joda.time Period)))
+
+(defn joda-sequence?
+  "Returns true iff the first 3 elements of the input are joda times.
+  We need to restrict to a sample in order to validate this as best we can
+  in order to catch common errors, since it's unwise to examine every item
+  of an infinite sequence! "
+  [input]
+  (every? #(instance? org.joda.time.DateTime %) (doall (take 3 input))))
+
+(def settings-schema
+  {:satellites [{s/Any s/Any}]
+   :service s/Str
+   :comets [{:command (s/either s/Str [s/Str])
+             :schedule (s/pred joda-sequence?)
+             (s/optional-key :timeout) s/Int
+             :output (s/pred clojure.test/function? 'clojure.test/function)}]
+   (s/optional-key :safe-env) (s/either s/Bool {s/Any s/Any})})
 
 (def settings
   {;; :satellite : [riemann-tcp-client]; configure one client per
@@ -89,3 +107,8 @@
   [config]
   (binding [*ns* (find-ns 'satellite-slave.config)]
     (load-file config)))
+
+(defn validate-current-settings!
+  []
+  (s/validate settings-schema settings))
+
