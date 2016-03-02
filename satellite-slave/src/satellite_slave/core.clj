@@ -145,6 +145,7 @@
 
 (defn -main
   [& [config args]]
+  (prn "HEY HEY STARTING!!!")
   (init-logging)
   (log/info "Starting Satellite-Slave")
   (if (and config
@@ -152,6 +153,8 @@
     (do (log/info (str "Reading config from file: " config))
         (config/include config))
     (log/info (str "Using default settings.")))
+  (config/validate-current-settings!)
+  (log/info "Configured settings correctly follow the settings schema.")
   (let [finish-chan (async/chan 1)
         dry-run (when args (.contains args "--dry-run"))]
     (app config/settings dry-run finish-chan)))
