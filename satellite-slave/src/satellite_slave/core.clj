@@ -20,7 +20,8 @@
             [clojure.test]
             [clojure.tools.logging :as log]
             [satellite-slave.config :as config]
-            [satellite-slave.mesos.monitoring :as monitor])
+            [satellite-slave.mesos.monitoring :as monitor]
+            [satellite-slave.util :refer [get-slave-host]])
   (:use riemann.client)
   (:import java.util.concurrent.TimeUnit)
   (:gen-class))
@@ -114,6 +115,7 @@
                                               :description (str "command: " (:command test) ex)}]))
                           add-time-and-svc (fn [riemann-event]
                                              (assoc riemann-event
+                                                    :host (get-slave-host config/settings)
                                                     :time (.toSeconds TimeUnit/MILLISECONDS
                                                                       (System/currentTimeMillis))
                                                     :service (str (:service settings)

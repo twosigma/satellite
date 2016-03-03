@@ -25,3 +25,8 @@
       t: Joda-Time"
   [t]
   (periodic-seq (t/now) t))
+
+(defn get-slave-host
+  [config]
+  (get config :slave-host (.getCanonicalHostName (java.net.InetAddress/getLocalHost)))
+)
