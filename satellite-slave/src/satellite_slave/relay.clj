@@ -15,7 +15,8 @@
 (ns satellite-slave.relay
   (:require
    [clj-http.client :as http]
-   [cheshire.core :as json]))
+   [cheshire.core :as json]
+   [satellite-slave.config :as config]))
 
 ;; type state = Map (Any, state) | List state
 
@@ -147,6 +148,8 @@
 (defn get-state
   "Retrieve mesos state as a map from a given slave host. If any exception e
    happens, it will simply return a map {:error e}."
+  ([]
+   (get-state (:slave-host config/settings)))
   ([host]
    (get-state ^String host "http"))
   ([^String host ^String scheme]
@@ -161,6 +164,8 @@
 (defn get-observability-metrics
   "Retrieve the observability metrics
   http://mesos.apache.org/documentation/latest/monitoring/"
+  ([]
+   (get-observability-metrics (:slave-host config/settings)))
   ([host]
    (get-observability-metrics ^String host "http"))
   ([^String host ^String scheme]
