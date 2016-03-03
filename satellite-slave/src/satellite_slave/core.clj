@@ -20,8 +20,7 @@
             [clojure.test]
             [clojure.tools.logging :as log]
             [satellite-slave.config :as config]
-            [satellite-slave.mesos.monitoring :as monitor]
-            [satellite-slave.util :refer [get-slave-host]])
+            [satellite-slave.mesos.monitoring :as monitor])
   (:use riemann.client)
   (:import java.util.concurrent.TimeUnit)
   (:gen-class))
@@ -100,7 +99,8 @@
                      (select-keys (System/getenv)
                                   ["JAVA" "http_proxy" "https_proxy"
                                    "no_proxy"])
-                     {"PATH" "/bin/:/usr/bin/:/sbin/:/usr/sbin/"}))]
+                     {"PATH" "/bin/:/usr/bin/:/sbin/:/usr/sbin/"}))
+        slave-host (:slave-host settings)]
     (doseq [test (:comets settings)]
       (chime-at (:schedule test)
                 (fn [_]
@@ -115,7 +115,7 @@
                                               :description (str "command: " (:command test) ex)}]))
                           add-time-and-svc (fn [riemann-event]
                                              (assoc riemann-event
-                                                    :host (get-slave-host config/settings)
+                                                    :host slave-host
                                                     :time (.toSeconds TimeUnit/MILLISECONDS
                                                                       (System/currentTimeMillis))
                                                     :service (str (:service settings)

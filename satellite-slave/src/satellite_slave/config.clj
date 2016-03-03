@@ -32,6 +32,7 @@
 (def settings-schema
   {:satellites [{s/Any s/Any}]
    :service s/Str
+   :slave-host s/Str
    :comets [{:command (s/either s/Str [s/Str])
              :schedule (s/pred #(sequence-seems-to?
                                  (partial instance? org.joda.time.DateTime) %))
@@ -114,3 +115,11 @@
   []
   (s/validate settings-schema settings))
 
+(def custom-comets [])
+
+(defn enrich-settings
+  [s]
+  (assoc s
+         :comets (into custom-comets (map build-comet (:comets s)))
+         :slave-host (or (:slave-host s)
+                         (.getHostName (java.net.InetAddress/getLocalHost)))))
