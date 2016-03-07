@@ -14,10 +14,6 @@
 
 (def custom-comets [])
 
-(defn enrich-settings
-  [s]
-  (assoc s :comets (into custom-comets (map build-comet (:comets s)))))
-
 (def settings
   (-> "{{ satellite_install_dir }}/satellite-slave-settings.json"
       clojure.java.io/reader
