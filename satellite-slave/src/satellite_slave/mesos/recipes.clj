@@ -18,7 +18,8 @@
             [clojure.tools.logging :as log]
             [satellite-slave.mesos.cache :as cache]
             [satellite-slave.mesos.monitoring :as mon]
-            [satellite-slave.util :refer [every get-slave-host]]))
+            [satellite-slave.util :refer [every]]
+            [satellite-slave.config :as config]))
 
 (defn cache-state
   "Return a map which could be used as input for core/run-test.
@@ -30,7 +31,7 @@
    Output:
        Return a map which could be used as input for core/run-test."
   [threshold period config]
-  (let [slave-host (get-slave-host config)]
+  (let [slave-host (:slave-host config/settings)]
     {:command ["echo" slave-host]
      :schedule (every period)
      :output (fn [& params]
@@ -52,8 +53,8 @@
   {:command ["echo" "mesos tasks failed"]
    :schedule (every period)
    :output (fn [& params]
-             (let [v (-> settings
-                         get-slave-host
+             (let [v (-> :slave-host
+                         config/settings
                          mon/parse-observability-metrics
                          mon/num-tasks-failed)]
                [{:service "total-tasks-failed"
@@ -68,8 +69,8 @@
   {:command ["echo" "mesos tasks finished"]
    :schedule (every period)
    :output (fn [& params]
-             (let [v (-> settings
-                         get-slave-host
+             (let [v (-> :slave-host
+                         config/settings
                          mon/parse-observability-metrics
                          mon/num-tasks-finished)]
                [{:service "total-tasks-finished"
@@ -84,8 +85,8 @@
   {:command ["echo" "mesos tasks started"]
    :schedule (every period)
    :output (fn [& params]
-             (let [v (-> settings
-                         get-slave-host
+             (let [v (-> :slave-host
+                         config/settings
                          mon/parse-observability-metrics
                          mon/num-tasks-started)]
                [{:service "total-tasks-started"

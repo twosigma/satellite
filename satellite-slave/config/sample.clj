@@ -27,10 +27,6 @@
                   :ttl 300
                   :description "example test -- number of files/dirs in cwd"}]))}])
 
-(defn enrich-settings
-  [s]
-  (assoc s :comets (into custom-comets (map build-comet (:comets s)))))
-
 (def settings
   (-> "config/sample-settings.json"
       clojure.java.io/reader
