@@ -115,7 +115,7 @@
 
 (defn exceeds-threshold?
   [{divisor :metric}  {dividend :metric} threshold]
-  (and (pos? divisor)
+  (and divisor dividend (pos? divisor)
        (or (zero? dividend)
            (> (/ divisor dividend) threshold))))
 
