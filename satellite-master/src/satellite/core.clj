@@ -193,7 +193,7 @@
                            (fn [] nil))
                    (riemann/start-riemann riemann-config)
                    (catch Throwable t
-                     (log/error "Riemann failed")
+                     (log/error t "Riemann failed")
                      (throw t))))
    :monitor (fnk [[:settings
                    sleep-time riemann-tcp-server-options]
