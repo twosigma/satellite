@@ -15,6 +15,7 @@
 (ns satellite.recipes
   (:require
    [clojure.tools.logging :refer :all]
+   [riemann.common :refer [event]]
    [riemann.streams :refer :all]
    [riemann.folds :as folds]
    [satellite.whitelist :as whitelist]))
@@ -135,14 +136,18 @@
   returns a single event which indicates whether the host seems to be a black hole,
   using :state ok or critical"
   [settings [failed started finished]]
-  (assoc failed
-         :service "task blackhole detected"
-         :state (if (and (exceeds-threshold? failed started
-                                             (:blackhole-fails-to-starts-threshold settings))
-                         (exceeds-threshold? failed finished
-                                             (:blackhole-fails-to-finishes-threshold settings)))
-                  "critical" "ok")
-         :description "Whether the host represents a black hole for tasks."
-         :metric nil
-         :tags nil))
+  (event {:host (:host failed)
+          :service "task blackhole detected"
+          :ttl (:ttl failed)
+          :state (if (and (exceeds-threshold? failed started
+                                              (:blackhole-fails-to-starts-threshold settings))
+                          (exceeds-threshold? failed finished
+                                              (:blackhole-fails-to-finishes-threshold settings)))
+                   "critical" "ok")
+          :description "Whether the host represents a black hole for tasks."
+          :failed (:metric failed)
+          :finished (:metric finished)
+          :started (:metric started)
+          :metric nil
+          :tags nil}))
 
