@@ -20,17 +20,19 @@
 ;; expire expired events every 5 seconds
 (periodically-expire 5)
 
-(def task-totals-ddt-stream
+(def task-totals-time-stream
   (by :host
-      (project [(service "mesos/slave/total-tasks-failed")
-                (service "mesos/slave/total-tasks-started")
-                (service "mesos/slave/total-tasks-finished")]
-               (smap (partial fold-blackhole-thresholds satellite.core/settings)
-                     (stable (* 2 (:blackhole-check-seconds satellite.core/settings)) :state
-                             (where (state "critical")
-                                    (fn [event]
-                                      (warn "Removing host because it is failing too many tasks.")
-                                      (off-host (:host event)))))))))
+      (combine difference-since-beginning
+               (project [(service "mesos/slave/total-tasks-failed")
+                         (service "mesos/slave/total-tasks-started")
+                         (service "mesos/slave/total-tasks-finished")]
+                        (where (> (:interval event) 600)
+                               (smap (partial fold-blackhole-thresholds satellite.core/settings)
+                                     (where (state "critical")
+                                            #(warn "Host failing too many tasks:" %)
+                                            (throttle 1 900
+                                                      #(warn "Emailing administration about task black hole." %)
+                                                      (email "foo@example.com")))))))))
 
 (streams
  indx
@@ -61,8 +63,8 @@
  ;; check task run totals to detect task host black holes
  (where (service #"mesos/slave/total-tasks-.*")
         (by [:host :service]
-            (ddt (:blackhole-check-seconds satellite.core/settings)
-                 task-totals-ddt-stream)))
+            (moving-time-window (:blackhole-check-seconds satellite.core/settings)
+                                task-totals-time-stream)))
 
  ;; if less than 70% of hosts registered with mesos are
  ;; on the whitelist, alert with an email

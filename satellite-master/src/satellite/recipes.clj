@@ -119,6 +119,17 @@
        (or (zero? dividend)
            (> (/ divisor dividend) threshold))))
 
+(defn difference-since-beginning
+  [es]
+  ;; if mesos-slave was restarted, the metric will go to 0, in which case we want
+  ;; to use THAT as the "beginning" rather than the first element of the vector.
+  (let [first (apply min-key :metric es)
+        last (last es)]
+    (assoc last
+           :metric (- (:metric last) (:metric first))
+           :interval (- (:time last) (:time first))
+           :event-count (count es))))
+
 (defn fold-blackhole-thresholds
   "Compares the trio of blackhole values against configured acceptance thresholds;
   returns a single event which indicates whether the host seems to be a black hole,
