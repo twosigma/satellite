@@ -23,10 +23,10 @@
 (def task-totals-time-stream
   (by :host
       (combine difference-since-beginning
-               (project [(service "mesos/slave/total-tasks-failed")
-                         (service "mesos/slave/total-tasks-started")
-                         (service "mesos/slave/total-tasks-finished")]
-                        (where (> (:interval event) 600)
+               (where (> (:interval event) 600)
+                      (project [(service "mesos/slave/total-tasks-failed")
+                                (service "mesos/slave/total-tasks-started")
+                                (service "mesos/slave/total-tasks-finished")]
                                (smap (partial fold-blackhole-thresholds satellite.core/settings)
                                      (where (state "critical")
                                             #(warn "Host failing too many tasks:" %)
