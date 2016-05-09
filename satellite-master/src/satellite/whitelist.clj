@@ -362,12 +362,16 @@
 
   Returns:
       nil"
-  [wtr cache]
+  [wtr whitelist-hostname-prefix cache]
   (let [all-child-datas (.. cache getCurrentData)
         num-all-child-datas (count all-child-datas)
         on-child-datas (filter child-data-on? all-child-datas)
         num-on-child-datas (count on-child-datas)
-        hostnames (map #(-> (.. % getPath) full-path->host) on-child-datas)]
+        hostnames (map #(-> (.. % getPath)
+                            full-path->host
+                            ((partial conj whitelist-hostname-prefix))
+                            ((partial clojure.string/join ".")))
+                       on-child-datas)]
     (log/info (str "Whitelist will contain " num-on-child-datas
                    " of " num-all-child-datas " hosts."))
     (reset! stats/num-available-hosts num-all-child-datas)

@@ -63,7 +63,8 @@
                           :max-sleep-time-ms s/Int
                           :max-retries s/Int}
    :local-whitelist-path s/Str
-   :whitelist-hostname-pred (s/pred clojure.test/function? 'clojure.test/function)})
+   :whitelist-hostname-pred (s/pred clojure.test/function? 'clojure.test/function)
+   :whitelist-hostname-prefix [(s/both s/Str (s/pred #(not (.contains % "."))))]})
 
 (def settings
   ;; Settings for the Satellite monitor/service
@@ -103,7 +104,9 @@
    :local-whitelist-path "whitelist"
    ;; predicate used to validate hosts that are added to the whitelist
    :whitelist-hostname-pred (fn [hostname]
-                              (identity hostname))})
+                              (identity hostname))
+   ;; extra dotted components to prepend to the hostname in the whitelist
+   :whitelist-hostname-prefix []})
 
 (defn map->graph
   [m]
@@ -126,10 +129,11 @@
                  (satellite.riemann.services.leader/leader-service
                   mesos-master-url)))
    ;; the path on Zookeeper to the whitelist coordination node
-   :whitelist-sync (fnk [curator leader [:settings local-whitelist-path] zk-whitelist-path]
+   :whitelist-sync (fnk [curator leader [:settings local-whitelist-path whitelist-hostname-prefix] zk-whitelist-path]
                         (let [whitelist-sync (satellite.riemann.services.whitelist/whitelist-sync-service
                                               curator zk-whitelist-path
                                               local-whitelist-path local-whitelist-path
+                                              whitelist-hostname-prefix
                                               (:leader? leader))]
                           (future
                             (intern 'satellite.recipes

@@ -74,21 +74,21 @@
         (testing "Empty dir"
           (.. curator create (forPath "/test" (byte-array 0)))
           (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr cache)
+            (write-out-cache! wtr [] cache)
             (is (= (.toString wtr)
                    ""))))
         (testing "Non-empty dir, singleton :on"
           (.. curator create (forPath "/test/foo" (whitelist-data->bytes managed-on-whitelist-data)))
           (Thread/sleep 500)
           (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr cache)
+            (write-out-cache! wtr [] cache)
             (is (= (.toString wtr)
                    "foo\n"))))
         (testing "Non-empty dir, multiple :on"
           (.. curator create (forPath "/test/bar" (whitelist-data->bytes managed-on-whitelist-data)))
           (Thread/sleep 500)
           (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr cache)
+            (write-out-cache! wtr [] cache)
             (is (= (.toString wtr)
                    "bar\nfoo\n"))))
         (testing "Turning a host :off"
@@ -96,14 +96,19 @@
           (.. curator create (forPath "/test/baz" (whitelist-data->bytes manual-on-whitelist-data)))
           (Thread/sleep 500)
           (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr cache)
+            (write-out-cache! wtr [] cache)
             (is (= (.toString wtr)
                    "baz\nfoo\n"))))
+        (testing "Using whitelist hostname prefix"
+          (let [wtr (java.io.StringWriter.)]
+            (write-out-cache! wtr ["prefix"] cache)
+            (is (= (.toString wtr)
+                   "prefix.baz\nprefix.foo\n"))))
         (testing "Turning another host :off"
           (.. curator setData (forPath "/test/baz" (whitelist-data->bytes manual-off-whitelist-data)))
           (Thread/sleep 500)
           (let [wtr (java.io.StringWriter.)]
-            (write-out-cache! wtr cache)
+            (write-out-cache! wtr [] cache)
             (is (= (.toString wtr)
                    "foo\n"))))
         (.close cache)))))
