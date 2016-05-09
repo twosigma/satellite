@@ -20,7 +20,7 @@
             [satellite.whitelist :as whitelist]))
 
 (defrecord WhitelistSyncService
-           [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path
+           [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path whitelist-hostname-prefix
             leader? core syncer]
   ServiceEquiv
   (equiv? [this other]
@@ -66,6 +66,7 @@
                                                                                   local-whitelist-path)]
                                                                    (whitelist/write-out-cache!
                                                                     wtr
+                                                                    whitelist-hostname-prefix
                                                                     cache))))
 
                   shutdown-reaper (whitelist/start-reaper! curator
@@ -82,8 +83,8 @@
       ((:reaper @syncer)))))
 
 (defn whitelist-sync-service
-  [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path
+  [curator zk-whitelist-path local-whitelist-path initial-local-whitelist-path whitelist-hostname-prefix
    leader?]
   (->WhitelistSyncService curator zk-whitelist-path local-whitelist-path
-                         initial-local-whitelist-path leader?
+                         initial-local-whitelist-path whitelist-hostname-prefix leader?
                          (atom nil) (promise)))
